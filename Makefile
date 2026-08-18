@@ -3,8 +3,9 @@
 
 SHELL := /usr/bin/env bash
 TOOLS := $(CURDIR)/tools
+SRC   := $(CURDIR)/src
 
-.PHONY: help check build flash serial clean patches-export patches-apply
+.PHONY: help check build flash serial clean patches-export patches-apply ctest
 
 help: ## 显示所有可用命令
 	@echo "zenix_Dummy 任务入口"
@@ -30,3 +31,6 @@ patches-export: ## 导出上游修改为补丁
 
 patches-apply: ## 应用 patches/ 下的补丁到上游
 	@$(TOOLS)/apply_patches.sh
+
+ctest: ## 编译并运行基础 C 程序（src/）
+	@$(MAKE) -C $(SRC) run

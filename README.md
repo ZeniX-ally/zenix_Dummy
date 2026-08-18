@@ -43,11 +43,28 @@
 | `make patches-export` | 导出上游修改为补丁 |
 | `make patches-apply` | 应用补丁到上游 |
 | `make clean` | 清理构建产物 |
+| `make ctest` | 编译并运行基础 C 程序（src/） |
+
+## 基础 C 程序
+
+位于 `src/`，是一个桌面机械臂运动学基础示例（与项目主题贴合）：
+
+- `src/kinematics.h` / `src/kinematics.c`：关节角度归一化、限位校验、夹爪钳位、简易正运动学
+- `src/main.c`：演示上述功能
+
+编译运行：
+
+```bash
+make ctest          # 等价 cd src && make run
+# 或直接
+cd src && make run
+```
 
 ## 目录结构
 
 ```
 docs/       项目文档（需求/路线图/BOM/排错）
+src/        基础 C 程序（运动学示例）
 firmware/   对上游源码的补丁
 software/   上位机封装
 hardware/   硬件方案
