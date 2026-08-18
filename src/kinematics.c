@@ -1,6 +1,11 @@
 #include "kinematics.h"
 #include <math.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+#define DEG2RAD (M_PI / 180.0f)
+
 float normalize_angle_deg(float deg) {
     while (deg >= 180.0f) deg -= 360.0f;
     while (deg < -180.0f) deg += 360.0f;
@@ -31,12 +36,12 @@ int forward_kinematics(const joint_state_t *js, float link_len,
 
     float yaw = 0.0f;
     for (size_t i = 0; i < ARM_JOINTS; ++i) {
-        yaw += js->q[i] * (float)(M_PI / 180.0);
+        yaw += js->q[i] * DEG2RAD;
     }
 
     float reach = link_len * (float)ARM_JOINTS;
     *x = reach * cosf(yaw);
     *y = reach * sinf(yaw);
-    *z = link_len * sinf(js->q[2] * (float)(M_PI / 180.0));
+    *z = link_len * sinf(js->q[2] * DEG2RAD);
     return 0;
 }
