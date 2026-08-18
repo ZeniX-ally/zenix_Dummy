@@ -4,6 +4,11 @@ build/
 *.hex
 *.bin
 *.map
+*.o
+*.out
+*.a
+# src/ 编译产物
+/src/zenix_dummy_demo
 
 # 上游源码克隆（本仓库不纳入）
 /home/zenix/Dummy-Robot/
