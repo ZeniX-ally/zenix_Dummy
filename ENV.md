@@ -36,14 +36,14 @@ cmake --build build -j2
 
 ## 已对上游源码做的本机兼容修改
 
-GCC 13 比原仓库时代更严格，已做以下小修改：
+GCC 13 比原仓库时代更严格，修改已归档入 `firmware/patches/patch-20260818-84453f1.patch`：
 
-1. `Core-STM32F4-fw/Bsp/imu/mpu6050.hpp` 增加小写软链接 `mpu6050.hpp`
+1. `Core-STM32F4-fw/Bsp/imu/` 下源码中的 `#include "mpu6050.hpp"` 修正为 `#include "MPU6050.hpp"`（解决 Linux 大小写敏感问题）
 2. `Ctrl-Step-Driver-STM32F1-fw/UserApp/common_inc.h`
 3. `Ctrl-Step-Driver-STM32F1-fw/UserApp/configurations.h`
 4. `Ctrl-Step-Driver-STM32F1-fw/Port/Platform/Utils/st_hardware.h`
 
-其中 2~4 是把 `stdint-gcc.h` 改为标准 `<stdint.h>`。
+其中 2~4 是把 `stdint-gcc.h` 改为标准 `<stdint.h>`。可用 `./tools/apply_patches.sh` 一键应用。
 
 ## 串口权限
 

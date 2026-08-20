@@ -1,0 +1,78 @@
+diff --git a/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050.cpp b/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050.cpp
+index 7acf6f5..503adc7 100644
+--- a/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050.cpp
++++ b/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050.cpp
+@@ -34,7 +34,7 @@ THE SOFTWARE.
+ ===============================================
+ */
+ 
+-#include "mpu6050.hpp"
++#include "MPU6050.hpp"
+ 
+ #define pgm_read_byte(addr)   (*(const unsigned char *)(addr))
+ 
+diff --git a/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_6Axis_MotionApps20.h b/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_6Axis_MotionApps20.h
+index 9c24814..6d49e78 100644
+--- a/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_6Axis_MotionApps20.h
++++ b/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_6Axis_MotionApps20.h
+@@ -39,7 +39,7 @@ THE SOFTWARE.
+ // MotionApps 2.0 DMP implementation, built using the MPU-6050EVB evaluation board
+ #define MPU6050_INCLUDE_DMP_MOTIONAPPS20
+ 
+-#include "mpu6050.hpp"
++#include "MPU6050.hpp"
+ 
+ // Tom Carpenter's conditional PROGMEM code
+ // http://forum.arduino.cc/index.php?topic=129407.0
+diff --git a/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_9Axis_MotionApps41.h b/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_9Axis_MotionApps41.h
+index aa67662..3c659a0 100644
+--- a/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_9Axis_MotionApps41.h
++++ b/2.Firmware/Core-STM32F4-fw/Bsp/imu/MPU6050_9Axis_MotionApps41.h
+@@ -39,7 +39,7 @@ THE SOFTWARE.
+ // MotionApps 4.1 DMP implementation, built using the MPU-9150 "MotionFit" board
+ #define MPU6050_INCLUDE_DMP_MOTIONAPPS41
+ 
+-#include "mpu6050.hpp"
++#include "MPU6050.hpp"
+ 
+ // Tom Carpenter's conditional PROGMEM code
+ // http://forum.arduino.cc/index.php?topic=129407.0
+diff --git a/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/Port/Platform/Utils/st_hardware.h b/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/Port/Platform/Utils/st_hardware.h
+index ceff30c..401ce15 100644
+--- a/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/Port/Platform/Utils/st_hardware.h
++++ b/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/Port/Platform/Utils/st_hardware.h
+@@ -1,7 +1,7 @@
+ #ifndef CTRL_STEP_FW_ST_HARDWARE_H
+ #define CTRL_STEP_FW_ST_HARDWARE_H
+ 
+-#include <stdint-gcc.h>
++#include <stdint.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff --git a/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/common_inc.h b/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/common_inc.h
+index 667506d..cb0e110 100644
+--- a/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/common_inc.h
++++ b/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/common_inc.h
+@@ -5,7 +5,7 @@
+ extern "C" {
+ #endif
+ /*---------------------------- C Scope ---------------------------*/
+-#include "stdint-gcc.h"
++#include <stdint.h>
+ 
+ void Main();
+ void OnUartCmd(uint8_t* _data, uint16_t _len);
+diff --git a/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/configurations.h b/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/configurations.h
+index 4b219e1..65ce646 100644
+--- a/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/configurations.h
++++ b/2.Firmware/Ctrl-Step-Driver-STM32F1-fw/UserApp/configurations.h
+@@ -6,7 +6,7 @@ extern "C" {
+ #endif
+ /*---------------------------- C Scope ---------------------------*/
+ #include <stdbool.h>
+-#include "stdint-gcc.h"
++#include <stdint.h>
+ 
+ typedef enum configStatus_t
+ {

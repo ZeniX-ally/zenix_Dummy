@@ -24,7 +24,7 @@ serial: ## 串口连通性自检
 	@$(TOOLS)/serial_test.sh
 
 clean: ## 清理上游 build 产物
-	@$(TOOLS)/clean.sh
+	@$(TOOLS)/clean.sh -y
 
 patches-export: ## 导出上游修改为补丁
 	@$(TOOLS)/export_patches.sh
