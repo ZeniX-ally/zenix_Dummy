@@ -89,26 +89,80 @@ int protocol_pack_frame(const protocol_frame_t *frame, checksum_type_t chk_type,
     return (int)idx;
 }
 
-/* ----------------- 结构体序列化 / 反序列化 ----------------- */
+/* ----------------- 边界安全的序列化 / 反序列化流 -----------------
+ * 相比裸指针 p += sizeof(float)，提供容量/边界检查（返回 -1 表示越界），
+ * payload 结构演化（增删字段 / 扩长度）时更安全、更易维护。 */
 
-static void serialize_float(uint8_t *dest, float val) {
-    memcpy(dest, &val, sizeof(float));
+void proto_writer_init(proto_writer_t *w, uint8_t *buf, size_t size) {
+    if (!w) return;
+    w->buf = buf;
+    w->size = size;
+    w->pos = 0;
 }
 
-static float deserialize_float(const uint8_t *src) {
-    float val;
-    memcpy(&val, src, sizeof(float));
-    return val;
+int proto_writer_u8(proto_writer_t *w, uint8_t v) {
+    if (!w || !w->buf || w->pos >= w->size) return -1;
+    w->buf[w->pos++] = v;
+    return 0;
 }
 
-static void serialize_uint16(uint8_t *dest, uint16_t val) {
-    dest[0] = (uint8_t)((val >> 8) & 0xFF);
-    dest[1] = (uint8_t)(val & 0xFF);
+int proto_writer_u16(proto_writer_t *w, uint16_t v) {
+    if (proto_writer_u8(w, (uint8_t)((v >> 8) & 0xFF)) != 0) return -1;
+    return proto_writer_u8(w, (uint8_t)(v & 0xFF));
 }
 
-static uint16_t deserialize_uint16(const uint8_t *src) {
-    return (uint16_t)(((uint16_t)src[0] << 8) | (uint16_t)src[1]);
+int proto_writer_f32(proto_writer_t *w, float v) {
+    return proto_writer_bytes(w, &v, sizeof(float));
 }
+
+int proto_writer_bytes(proto_writer_t *w, const void *src, size_t n) {
+    if (!w || !w->buf || !src || n > (w->size - w->pos)) return -1;
+    memcpy(&w->buf[w->pos], src, n);
+    w->pos += n;
+    return 0;
+}
+
+size_t proto_writer_tell(const proto_writer_t *w) {
+    return w ? w->pos : 0;
+}
+
+void proto_reader_init(proto_reader_t *r, const uint8_t *buf, size_t size) {
+    if (!r) return;
+    r->buf = buf;
+    r->size = size;
+    r->pos = 0;
+}
+
+int proto_reader_u8(proto_reader_t *r, uint8_t *out) {
+    if (!r || !r->buf || !out || r->pos >= r->size) return -1;
+    *out = r->buf[r->pos++];
+    return 0;
+}
+
+int proto_reader_u16(proto_reader_t *r, uint16_t *out) {
+    uint8_t hi, lo;
+    if (proto_reader_u8(r, &hi) != 0) return -1;
+    if (proto_reader_u8(r, &lo) != 0) return -1;
+    if (out) *out = (uint16_t)(((uint16_t)hi << 8) | (uint16_t)lo);
+    return 0;
+}
+
+int proto_reader_f32(proto_reader_t *r, float *out) {
+    return proto_reader_bytes(r, out, sizeof(float));
+}
+
+int proto_reader_bytes(proto_reader_t *r, void *dst, size_t n) {
+    if (!r || !r->buf || !dst || n > (r->size - r->pos)) return -1;
+    memcpy(dst, &r->buf[r->pos], n);
+    r->pos += n;
+    return 0;
+}
+
+size_t proto_reader_tell(const proto_reader_t *r) {
+    return r ? r->pos : 0;
+}
+
+/* ----------------- 封包（统一走 writer，越界自动失败） ----------------- */
 
 int protocol_pack_set_joint_pos(uint8_t seq, const cmd_set_joint_pos_t *cmd,
                                 checksum_type_t chk_type,
@@ -117,16 +171,15 @@ int protocol_pack_set_joint_pos(uint8_t seq, const cmd_set_joint_pos_t *cmd,
     protocol_frame_t frame;
     frame.seq = seq;
     frame.cmd = CMD_SET_JOINT_POS;
-    frame.payload_len = (NUM_JOINTS + 2) * sizeof(float); /* 6 angles + speed + gripper = 32 bytes */
+    frame.payload_len = (NUM_JOINTS + 2) * sizeof(float); /* 6 angles + speed + gripper */
 
-    uint8_t *p = frame.payload;
+    proto_writer_t w;
+    proto_writer_init(&w, frame.payload, sizeof(frame.payload));
     for (int i = 0; i < NUM_JOINTS; i++) {
-        serialize_float(p, cmd->angles[i]);
-        p += sizeof(float);
+        if (proto_writer_f32(&w, cmd->angles[i]) != 0) return -1;
     }
-    serialize_float(p, cmd->speed);
-    p += sizeof(float);
-    serialize_float(p, cmd->gripper);
+    if (proto_writer_f32(&w, cmd->speed) != 0) return -1;
+    if (proto_writer_f32(&w, cmd->gripper) != 0) return -1;
 
     return protocol_pack_frame(&frame, chk_type, out_buf, out_buf_size);
 }
@@ -138,17 +191,18 @@ int protocol_pack_set_cartesian_pos(uint8_t seq, const cmd_set_cartesian_pos_t *
     protocol_frame_t frame;
     frame.seq = seq;
     frame.cmd = CMD_SET_CARTESIAN_POS;
-    frame.payload_len = (6 + 2) * sizeof(float); /* x,y,z,roll,pitch,yaw + speed + gripper = 32 bytes */
+    frame.payload_len = (6 + 2) * sizeof(float); /* x,y,z,roll,pitch,yaw + speed + gripper */
 
-    uint8_t *p = frame.payload;
-    serialize_float(p, cmd->pose.x);     p += sizeof(float);
-    serialize_float(p, cmd->pose.y);     p += sizeof(float);
-    serialize_float(p, cmd->pose.z);     p += sizeof(float);
-    serialize_float(p, cmd->pose.roll);  p += sizeof(float);
-    serialize_float(p, cmd->pose.pitch); p += sizeof(float);
-    serialize_float(p, cmd->pose.yaw);   p += sizeof(float);
-    serialize_float(p, cmd->speed);      p += sizeof(float);
-    serialize_float(p, cmd->gripper);
+    proto_writer_t w;
+    proto_writer_init(&w, frame.payload, sizeof(frame.payload));
+    if (proto_writer_f32(&w, cmd->pose.x)     != 0) return -1;
+    if (proto_writer_f32(&w, cmd->pose.y)     != 0) return -1;
+    if (proto_writer_f32(&w, cmd->pose.z)     != 0) return -1;
+    if (proto_writer_f32(&w, cmd->pose.roll)  != 0) return -1;
+    if (proto_writer_f32(&w, cmd->pose.pitch) != 0) return -1;
+    if (proto_writer_f32(&w, cmd->pose.yaw)   != 0) return -1;
+    if (proto_writer_f32(&w, cmd->speed)      != 0) return -1;
+    if (proto_writer_f32(&w, cmd->gripper)    != 0) return -1;
 
     return protocol_pack_frame(&frame, chk_type, out_buf, out_buf_size);
 }
@@ -160,46 +214,43 @@ int protocol_pack_status_report(uint8_t seq, const report_status_payload_t *stat
     protocol_frame_t frame;
     frame.seq = seq;
     frame.cmd = CMD_REPORT_STATUS;
-    
-    /* 1(state) + 1(err) + 2(voltage) + 6*4(angles) + 6*4(pose) + 4(gripper) = 4 + 24 + 24 + 4 = 56 bytes */
-    frame.payload_len = 1 + 1 + 2 + (NUM_JOINTS + 6 + 1) * sizeof(float);
+    /* 1(state) + 1(err) + 2(voltage) + 6*4(angles) + 6*4(pose) + 4(gripper) */
+    frame.payload_len = 1 + 1 + 2 + (NUM_JOINTS + 6 + 1) * (uint8_t)sizeof(float);
 
-    uint8_t *p = frame.payload;
-    *p++ = status->robot_state;
-    *p++ = status->error_code;
-    serialize_uint16(p, status->voltage_mv);
-    p += 2;
-
+    proto_writer_t w;
+    proto_writer_init(&w, frame.payload, sizeof(frame.payload));
+    if (proto_writer_u8(&w, status->robot_state)      != 0) return -1;
+    if (proto_writer_u8(&w, status->error_code)       != 0) return -1;
+    if (proto_writer_u16(&w, status->voltage_mv)      != 0) return -1;
     for (int i = 0; i < NUM_JOINTS; i++) {
-        serialize_float(p, status->current_angles[i]);
-        p += sizeof(float);
+        if (proto_writer_f32(&w, status->current_angles[i]) != 0) return -1;
     }
-
-    serialize_float(p, status->current_pose.x);     p += sizeof(float);
-    serialize_float(p, status->current_pose.y);     p += sizeof(float);
-    serialize_float(p, status->current_pose.z);     p += sizeof(float);
-    serialize_float(p, status->current_pose.roll);  p += sizeof(float);
-    serialize_float(p, status->current_pose.pitch); p += sizeof(float);
-    serialize_float(p, status->current_pose.yaw);   p += sizeof(float);
-
-    serialize_float(p, status->gripper_pos);
+    if (proto_writer_f32(&w, status->current_pose.x)     != 0) return -1;
+    if (proto_writer_f32(&w, status->current_pose.y)     != 0) return -1;
+    if (proto_writer_f32(&w, status->current_pose.z)     != 0) return -1;
+    if (proto_writer_f32(&w, status->current_pose.roll)  != 0) return -1;
+    if (proto_writer_f32(&w, status->current_pose.pitch) != 0) return -1;
+    if (proto_writer_f32(&w, status->current_pose.yaw)   != 0) return -1;
+    if (proto_writer_f32(&w, status->gripper_pos)        != 0) return -1;
 
     return protocol_pack_frame(&frame, chk_type, out_buf, out_buf_size);
 }
 
+/* ----------------- 反序列化（统一走 reader，越界自动失败） ----------------- */
+
 int protocol_unpack_set_joint_pos(const protocol_frame_t *frame, cmd_set_joint_pos_t *out_cmd) {
     if (!frame || !out_cmd) return -1;
-    if (frame->cmd != CMD_SET_JOINT_POS || frame->payload_len < (NUM_JOINTS + 2) * sizeof(float)) {
+    if (frame->cmd != CMD_SET_JOINT_POS ||
+        frame->payload_len < (NUM_JOINTS + 2) * sizeof(float)) {
         return -1;
     }
-    const uint8_t *p = frame->payload;
+    proto_reader_t r;
+    proto_reader_init(&r, frame->payload, frame->payload_len);
     for (int i = 0; i < NUM_JOINTS; i++) {
-        out_cmd->angles[i] = deserialize_float(p);
-        p += sizeof(float);
+        if (proto_reader_f32(&r, &out_cmd->angles[i]) != 0) return -1;
     }
-    out_cmd->speed = deserialize_float(p);
-    p += sizeof(float);
-    out_cmd->gripper = deserialize_float(p);
+    if (proto_reader_f32(&r, &out_cmd->speed)   != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->gripper) != 0) return -1;
     return 0;
 }
 
@@ -209,24 +260,21 @@ int protocol_unpack_status_report(const protocol_frame_t *frame, report_status_p
     if (frame->cmd != CMD_REPORT_STATUS || frame->payload_len < expected_len) {
         return -1;
     }
-    const uint8_t *p = frame->payload;
-    out_status->robot_state = *p++;
-    out_status->error_code  = *p++;
-    out_status->voltage_mv  = deserialize_uint16(p);
-    p += 2;
-
+    proto_reader_t r;
+    proto_reader_init(&r, frame->payload, frame->payload_len);
+    if (proto_reader_u8(&r, &out_status->robot_state)  != 0) return -1;
+    if (proto_reader_u8(&r, &out_status->error_code)   != 0) return -1;
+    if (proto_reader_u16(&r, &out_status->voltage_mv)  != 0) return -1;
     for (int i = 0; i < NUM_JOINTS; i++) {
-        out_status->current_angles[i] = deserialize_float(p);
-        p += sizeof(float);
+        if (proto_reader_f32(&r, &out_status->current_angles[i]) != 0) return -1;
     }
-    out_status->current_pose.x     = deserialize_float(p); p += sizeof(float);
-    out_status->current_pose.y     = deserialize_float(p); p += sizeof(float);
-    out_status->current_pose.z     = deserialize_float(p); p += sizeof(float);
-    out_status->current_pose.roll  = deserialize_float(p); p += sizeof(float);
-    out_status->current_pose.pitch = deserialize_float(p); p += sizeof(float);
-    out_status->current_pose.yaw   = deserialize_float(p); p += sizeof(float);
-
-    out_status->gripper_pos = deserialize_float(p);
+    if (proto_reader_f32(&r, &out_status->current_pose.x)     != 0) return -1;
+    if (proto_reader_f32(&r, &out_status->current_pose.y)     != 0) return -1;
+    if (proto_reader_f32(&r, &out_status->current_pose.z)     != 0) return -1;
+    if (proto_reader_f32(&r, &out_status->current_pose.roll)  != 0) return -1;
+    if (proto_reader_f32(&r, &out_status->current_pose.pitch) != 0) return -1;
+    if (proto_reader_f32(&r, &out_status->current_pose.yaw)   != 0) return -1;
+    if (proto_reader_f32(&r, &out_status->gripper_pos)        != 0) return -1;
     return 0;
 }
 
@@ -369,6 +417,54 @@ bool protocol_parse_byte(protocol_parser_t *parser, uint8_t byte, protocol_frame
             break;
     }
     return false;
+}
+
+/* ----------------- 命令登记表与分发中心 -----------------
+ * 协议扩展点：新增一条命令 = 枚举 +1 项、实现 unpack 钩子、表里 +1 行。
+ * 哨兵项必须保持 cmd == (protocol_cmd_t)0。 */
+static int unpack_set_joint_pos_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_set_joint_pos(frame, (cmd_set_joint_pos_t *)out_data);
+}
+
+static int unpack_status_report_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_status_report(frame, (report_status_payload_t *)out_data);
+}
+
+static const protocol_cmd_info_t PROTOCOL_CMD_TABLE[] = {
+    { CMD_PING,              "ping",                0,                                        NULL },
+    { CMD_EMERGENCY_STOP,    "emergency_stop",      0,                                        NULL },
+    { CMD_SET_ENABLE,        "set_enable",          0,                                        NULL },
+    { CMD_SET_JOINT_POS,     "set_joint_pos",       (NUM_JOINTS + 2)        * (uint16_t)sizeof(float), unpack_set_joint_pos_thunk },
+    { CMD_SET_CARTESIAN_POS, "set_cartesian_pos",   (6 + 2)                 * (uint16_t)sizeof(float), NULL },
+    { CMD_GET_STATUS,        "get_status",          0,                                        NULL },
+    { CMD_REPORT_STATUS,     "report_status",       1 + 1 + 2 + (NUM_JOINTS + 6 + 1) * (uint16_t)sizeof(float), unpack_status_report_thunk },
+    { CMD_ACK,               "ack",                 0,                                        NULL },
+    { CMD_NACK,              "nack",                0,                                        NULL },
+    { (protocol_cmd_t)0,     NULL,                  0,                                        NULL } /* 哨兵 */
+};
+
+const protocol_cmd_info_t *protocol_cmd_lookup(protocol_cmd_t cmd) {
+    for (int i = 0; PROTOCOL_CMD_TABLE[i].cmd != (protocol_cmd_t)0; i++) {
+        if (PROTOCOL_CMD_TABLE[i].cmd == cmd) {
+            return &PROTOCOL_CMD_TABLE[i];
+        }
+    }
+    return NULL;
+}
+
+int protocol_cmd_count(void) {
+    int n = 0;
+    for (; PROTOCOL_CMD_TABLE[n].cmd != (protocol_cmd_t)0; n++) { /* 遍历 */ }
+    return n;
+}
+
+int protocol_unpack_command(const protocol_frame_t *frame, void *out_data) {
+    if (!frame) return -1;
+    const protocol_cmd_info_t *info = protocol_cmd_lookup(frame->cmd);
+    if (!info) return -1;                 /* 未登记的命令 */
+    if (frame->payload_len < info->min_payload) return -2; /* 载荷过短 */
+    if (!info->unpack) return -3;         /* 已登记但未实现解包钩子 */
+    return info->unpack(frame, out_data);
 }
 
 /* ----------------- ASCII 协议辅助 ----------------- */

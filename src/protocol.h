@@ -132,6 +132,61 @@ int protocol_unpack_frame(const uint8_t *buf, size_t len, checksum_type_t chk_ty
 int protocol_unpack_set_joint_pos(const protocol_frame_t *frame, cmd_set_joint_pos_t *out_cmd);
 int protocol_unpack_status_report(const protocol_frame_t *frame, report_status_payload_t *out_status);
 
+/* ---------- 边界安全序列化 / 反序列化流 ----------
+ * 用于在 frame->payload 与 struct 之间编解码。
+ * 相比裸指针 p += sizeof(...)，具备溢出检查，payload 结构演化时更安全、
+ * 更易扩展（新增字段不会破坏原有字段）。 */
+typedef struct {
+    uint8_t *buf;    /* 目标缓冲区 */
+    size_t   size;   /* 缓冲区容量 */
+    size_t   pos;    /* 当前写游标 */
+} proto_writer_t;
+
+typedef struct {
+    const uint8_t *buf; /* 源缓冲区 */
+    size_t   size;      /* 源长度 */
+    size_t   pos;       /* 当前读游标 */
+} proto_reader_t;
+
+void   proto_writer_init(proto_writer_t *w, uint8_t *buf, size_t size);
+int    proto_writer_u8(proto_writer_t *w, uint8_t v);      /* 0 成功；-1 空间不足 */
+int    proto_writer_u16(proto_writer_t *w, uint16_t v);    /* 大端 */
+int    proto_writer_f32(proto_writer_t *w, float v);
+int    proto_writer_bytes(proto_writer_t *w, const void *src, size_t n);
+size_t proto_writer_tell(const proto_writer_t *w);
+
+void   proto_reader_init(proto_reader_t *r, const uint8_t *buf, size_t size);
+int    proto_reader_u8(proto_reader_t *r, uint8_t *out);
+int    proto_reader_u16(proto_reader_t *r, uint16_t *out);
+int    proto_reader_f32(proto_reader_t *r, float *out);
+int    proto_reader_bytes(proto_reader_t *r, void *dst, size_t n);
+size_t proto_reader_tell(const proto_reader_t *r);
+
+/* ---------- 命令登记表（协议扩展点） ----------
+ * 定义一次即可让 unpack 分发中心 protocol_unpack_command() 自动识别。
+ * 新增一条业务命令的标准流程（详见 docs/ 扩展指南）：
+ *   1) 在 protocol_cmd_t 枚举中增加命令 ID；
+ *   2) 实现 unpack 钩子（或先置 NULL）；
+ *   3) 在 PROTOCOL_CMD_TABLE（protocol.c）中登记：{ cmd, "name", min_payload, unpack }。
+ */
+typedef int (*protocol_unpack_fn_t)(const protocol_frame_t *frame, void *out_data);
+
+typedef struct {
+    protocol_cmd_t       cmd;          /* 命令 ID */
+    const char          *name;         /* 人类可读名（调试/日志） */
+    uint16_t             min_payload;  /* 最小合法载荷长度（保护性校验） */
+    protocol_unpack_fn_t unpack;       /* 反序列化钩子；NULL 表示暂未实现 */
+} protocol_cmd_info_t;
+
+/* 按命令 ID 查询命令信息；未登记返回 NULL */
+const protocol_cmd_info_t *protocol_cmd_lookup(protocol_cmd_t cmd);
+/* 已登记命令数量（不含哨兵项） */
+int protocol_cmd_count(void);
+/* 按帧命令分发到对应 unpack；
+ * 返回 0 成功；-1 未知命令/参数错；-2 载荷过短；-3 已登记但未实现钩子
+ * 其余为 unpack 自身返回值 */
+int protocol_unpack_command(const protocol_frame_t *frame, void *out_data);
+
 /* ASCII 格式控制命令编码与解析 (兼容上位机命令行终端) */
 int protocol_ascii_format_move_joint(char *out_str, size_t max_len, const joint_state_t *js, float speed);
 int protocol_ascii_format_move_line(char *out_str, size_t max_len, const pose6d_t *pose, float speed);
