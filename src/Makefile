@@ -7,9 +7,10 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c11 -Wall -Wextra -O2 -pedantic
 TARGET  := zenix_dummy_demo
-SRCS    := main.c kinematics.c protocol.c trajectory.c
+# 自动收集本目录所有 .c/.h：新增模块无需修改此文件
+SRCS    := $(wildcard *.c)
 OBJS    := $(SRCS:.c=.o)
-HEADERS := kinematics.h protocol.h trajectory.h
+HEADERS := $(wildcard *.h)
 
 .PHONY: all run test clean
 

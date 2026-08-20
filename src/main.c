@@ -453,6 +453,168 @@ static int test_protocol_ascii(void) {
     return 0;
 }
 
+/* 测试 9: 可扩展性 —— 关节限位可配置 + 统一选解 API */
+static int test_extensibility_kinematics(void) {
+    printf("--- [TEST 9] Extensibility: Configurable Joint Limits & Unified Solver ---\n");
+
+    /* 9.1 默认限位 */
+    joint_limits_t def = kinematics_get_default_limits();
+    TEST_ASSERT(fabsf(def.min_deg[0] + 180.0f) < 1e-3f, "Default J1 min limit");
+    TEST_ASSERT(fabsf(def.max_deg[3] - 180.0f) < 1e-3f, "Default J4 max limit");
+
+    /* 9.2 运行时覆盖限位：把所有关节收到 [-45,45]，验证限位接口遵循新值 */
+    joint_limits_t tight = def;
+    for (int j = 0; j < NUM_JOINTS; j++) {
+        tight.min_deg[j] = -45.0f;
+        tight.max_deg[j] = 45.0f;
+    }
+    TEST_ASSERT(kinematics_set_limits(&tight) == 0, "Set custom limits should succeed");
+
+    joint_limits_t readback;
+    kinematics_get_limits(&readback);
+    TEST_ASSERT(fabsf(readback.max_deg[0] - 45.0f) < 1e-3f, "Limits readback mismatch");
+
+    joint_state_t js = { .angles = { 60.0f, 100.0f, 10.0f, 40.0f, 20.0f, 30.0f },
+                         .gripper = 0.0f };
+    TEST_ASSERT(!is_joint_within_limits(0, 60.0f), "60 deg should exceed tight J1 max 45");
+    TEST_ASSERT(is_joint_within_limits(0, 30.0f), "30 deg within tight J1");
+    clamp_joint_angles(&js);
+    TEST_ASSERT(fabsf(js.angles[0] - 45.0f) < 1e-3f, "clamp should cap J1 at 45");
+    TEST_ASSERT(fabsf(js.angles[1] - 45.0f) < 1e-3f, "clamp should cap J2 at 45");
+
+    /* 恢复默认限位，避免污染后续用途 */
+    TEST_ASSERT(kinematics_set_limits(&def) == 0, "Restore default limits");
+
+    /* 9.3 统一选解 API：取一个可达且有可解位姿作为基准（TEST 1 的 case 2），
+     * 验证两种选解策略都能返回满足精度的解，且 CLOSEST_TO_LAST 确实做到最近 */
+    ik_config_t cfg = kinematics_get_default_config();
+    joint_state_t ref = { .angles = { 30.0f, 30.0f, -40.0f, 0.0f, 20.0f, 0.0f },
+                          .gripper = 0.0f };
+    pose6d_t pose;
+    TEST_ASSERT(kinematics_forward_6dof(&ref, &cfg, &pose) == 0, "FK ref pose");
+    ik_solutions_t solves;
+    TEST_ASSERT(kinematics_inverse_all(&pose, NULL, &cfg, &solves) == IK_SUCCESS,
+                "inverse_all failed");
+
+    joint_state_t out_min, out_closest;
+    TEST_ASSERT(kinematics_select_solution(&solves, &cfg, SOL_SELECT_MIN_SQUARED, NULL, &out_min) == IK_SUCCESS,
+                "select MIN_SQUARED failed");
+    /* MIN_SQUARED 输出必须闭环回到目标位姿 */
+    pose6d_t verify;
+    kinematics_forward_6dof(&out_min, &cfg, &verify);
+    float dx = verify.x - pose.x, dy = verify.y - pose.y, dz = verify.z - pose.z;
+    TEST_ASSERT(sqrtf(dx*dx + dy*dy + dz*dz) < 0.1f, "MIN_SQUARED closed-loop");
+
+    /* CLOSEST_TO_LAST：以 MIN 输出为参考（本身是限位内有效解），应返回限位内最接近的解 */
+    joint_state_t last = out_min;
+    TEST_ASSERT(kinematics_select_solution(&solves, &cfg, SOL_SELECT_CLOSEST_TO_LAST,
+                                           &last, &out_closest) == IK_SUCCESS,
+                "select CLOSEST_TO_LAST failed");
+
+    float d_closest = 0.0f;
+    for (int j = 0; j < NUM_JOINTS; j++) {
+        d_closest += fabsf(traj_angle_diff(last.angles[j], out_closest.angles[j]));
+    }
+
+    /* 最优性校验：out_closest 到 last 的距离不应大于任何"可达且在限位内"的候选解 */
+    float best_cost = 1e9f;
+    for (int i = 0; i < 8; i++) {
+        if (solves.sol_flags[i][1] == 0) continue;
+        bool in_lim = true;
+        for (int j = 0; j < NUM_JOINTS; j++) {
+            if (!is_joint_within_limits(j, solves.solutions[i].angles[j])) { in_lim = false; break; }
+        }
+        if (!in_lim) continue;
+        float c = 0.0f;
+        for (int j = 0; j < NUM_JOINTS; j++) {
+            c += fabsf(traj_angle_diff(last.angles[j], solves.solutions[i].angles[j]));
+        }
+        if (c < best_cost) best_cost = c;
+    }
+    TEST_ASSERT(d_closest < 1.0f, "CLOSEST_TO_LAST should be very close to last");
+    TEST_ASSERT(d_closest <= best_cost + 0.1f, "CLOSEST_TO_LAST should be optimal among valid sols");
+
+    printf("  Configurable limits + unified solver PASSED (d_closest=%.2f <= best=%.2f).\n\n",
+           d_closest, best_cost);
+    return 0;
+}
+
+/* 测试 10: 可扩展性 —— 序列化流 + 命令登记表/分发中心 */
+static int test_extensibility_protocol(void) {
+    printf("--- [TEST 10] Extensibility: Serializer Stream & Command Registry ---\n");
+
+    /* 10.1 序列化流：f32/u16/u8 往返 + 越界保护 */
+    uint8_t sbuf[64];
+    proto_writer_t w;
+    proto_writer_init(&w, sbuf, sizeof(sbuf));
+    TEST_ASSERT(proto_writer_f32(&w, 3.5f) == 0, "writer f32");
+    TEST_ASSERT(proto_writer_u16(&w, 0xABCD) == 0, "writer u16");
+    TEST_ASSERT(proto_writer_u8(&w, 0x7F) == 0, "writer u8");
+    TEST_ASSERT(proto_writer_tell(&w) == 4 + 2 + 1, "writer tell");
+
+    proto_reader_t r;
+    proto_reader_init(&r, sbuf, proto_writer_tell(&w));
+    float f; uint16_t u; uint8_t b;
+    TEST_ASSERT(proto_reader_f32(&r, &f) == 0 && fabsf(f - 3.5f) < 1e-6f, "reader f32 roundtrip");
+    TEST_ASSERT(proto_reader_u16(&r, &u) == 0 && u == 0xABCD, "reader u16 roundtrip (big-endian)");
+    TEST_ASSERT(proto_reader_u8(&r, &b) == 0 && b == 0x7F, "reader u8 roundtrip");
+
+    uint8_t tiny[1] = { 0 };
+    proto_reader_t r2;
+    proto_reader_init(&r2, tiny, 1);
+    TEST_ASSERT(proto_reader_u16(&r2, &u) == -1, "reader overflow should fail");
+    TEST_ASSERT(proto_reader_f32(&r2, &f) == -1, "reader f32 overflow should fail");
+
+    /* 10.2 命令登记表：查询与分发 */
+    TEST_ASSERT(protocol_cmd_count() > 0, "cmd registry not empty");
+    const protocol_cmd_info_t *info = protocol_cmd_lookup(CMD_SET_JOINT_POS);
+    TEST_ASSERT(info != NULL, "lookup set_joint_pos");
+    TEST_ASSERT(strcmp(info->name, "set_joint_pos") == 0, "cmd name");
+    TEST_ASSERT(protocol_cmd_lookup((protocol_cmd_t)0x55) == NULL, "unknown cmd lookup");
+
+    /* 用分发中心解包一个真实帧：先打包再走 protocol_unpack_command */
+    uint8_t packed[64];
+    cmd_set_joint_pos_t cmd;
+    for (int i = 0; i < NUM_JOINTS; i++) cmd.angles[i] = 10.0f * (i + 1);
+    cmd.speed = 12.5f;
+    cmd.gripper = 0.75f;
+    int len = protocol_pack_set_joint_pos(0x09, &cmd, CHECKSUM_CRC16, packed, sizeof(packed));
+    TEST_ASSERT(len > 0, "pack set joint pos");
+
+    protocol_frame_t frame;
+    TEST_ASSERT(protocol_unpack_frame(packed, (size_t)len, CHECKSUM_CRC16, &frame) == 0,
+                "unpack frame");
+
+    cmd_set_joint_pos_t decoded;
+    TEST_ASSERT(protocol_unpack_command(&frame, &decoded) == 0, "dispatch set_joint_pos");
+    for (int i = 0; i < NUM_JOINTS; i++) {
+        TEST_ASSERT(fabsf(decoded.angles[i] - cmd.angles[i]) < 1e-4f, "dispatched angle");
+    }
+    TEST_ASSERT(fabsf(decoded.speed - 12.5f) < 1e-4f, "dispatched speed");
+    TEST_ASSERT(fabsf(decoded.gripper - 0.75f) < 1e-4f, "dispatched gripper");
+
+    /* 未登记命令 -> -1；已登记但未实现钩子 -> -3；载荷过短 -> -2 */
+    protocol_frame_t unknown;
+    memset(&unknown, 0, sizeof(unknown));
+    unknown.cmd = (protocol_cmd_t)0x55;
+    TEST_ASSERT(protocol_unpack_command(&unknown, NULL) == -1, "unknown cmd dispatch");
+
+    protocol_frame_t notimpl;
+    memset(&notimpl, 0, sizeof(notimpl));
+    notimpl.cmd = CMD_SET_CARTESIAN_POS;
+    notimpl.payload_len = (6 + 2) * (uint8_t)sizeof(float);
+    TEST_ASSERT(protocol_unpack_command(&notimpl, NULL) == -3, "not-implemented hook dispatch");
+
+    protocol_frame_t shortf;
+    memset(&shortf, 0, sizeof(shortf));
+    shortf.cmd = CMD_SET_JOINT_POS;
+    shortf.payload_len = 1; /* 过短 */
+    TEST_ASSERT(protocol_unpack_command(&shortf, NULL) == -2, "short payload dispatch");
+
+    printf("  Serializer stream + command registry PASSED.\n\n");
+    return 0;
+}
+
 int main(void) {
     printf("====================================================\n");
     printf("   Dummy Robot Kinematics & Protocol Unit Tests    \n");
@@ -466,9 +628,11 @@ int main(void) {
     if (test_trajectory_profile() != 0) return 1;
     if (test_trajectory_joint_p2p() != 0) return 1;
     if (test_trajectory_line_ik() != 0) return 1;
+    if (test_extensibility_kinematics() != 0) return 1;
+    if (test_extensibility_protocol() != 0) return 1;
 
     printf("====================================================\n");
-    printf("   ALL 8 TEST SUITES PASSED SUCCESSFULLY! (100%%)   \n");
+    printf("   ALL 10 TEST SUITES PASSED SUCCESSFULLY! (100%%)  \n");
     printf("====================================================\n");
     return 0;
 }

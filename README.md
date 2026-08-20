@@ -29,6 +29,7 @@
 - [docs/roadmap.md](docs/roadmap.md) — 任务与里程碑
 - [docs/bom.md](docs/bom.md) — 采购清单与预算跟踪
 - [docs/troubleshooting.md](docs/troubleshooting.md) — 排错手册
+- [docs/extending.md](docs/extending.md) — 代码扩展指南（换机型/加命令/加模块…）
 
 ## 常用命令
 
@@ -49,10 +50,11 @@
 
 位于 `src/`，是一个桌面机械臂运动学/通信/轨迹基础示例（与项目主题贴合）：
 
-- `src/kinematics.h` / `src/kinematics.c`：关节角度归一化、限位校验、夹爪钳位、6-DOF 正运动学、8 分支解析逆运动学（含奇异点保护）
-- `src/protocol.h` / `src/protocol.c`：二进制帧打包/解包（Sum8/CRC16 校验）、流式状态机解析器、ASCII 命令编码（兼容上位机 CLI）
+- `src/common.h`：跨模块公共常量与纯数学工具（角度换算/环绕/钳位）
+- `src/kinematics.h` / `src/kinematics.c`：6-DOF 正运动学、8 分支解析逆运动学（含奇异点保护）、**运行时可配置关节限位**、**统一多解择优**（默认/最近/可扩展）
+- `src/protocol.h` / `src/protocol.c`：二进制帧打包/解包（Sum8/CRC16 校验）、流式状态机解析器、**边界安全序列化流**、**命令登记表与分发中心**（加命令只需登记一行）、ASCII 命令编码
 - `src/trajectory.h` / `src/trajectory.c`：梯形速度廓线、关节空间点对点同步运动、笛卡尔直线运动 + 连续 IK 分支跟踪
-- `src/main.c`：8 组单元测试（FK/IK 闭环、多解/奇异、协议校验、流式解析、ASCII、廓线、P2P、直线+IK）
+- `src/main.c`：10 组单元测试（FK/IK 闭环、多解/奇异、协议校验、流式解析、ASCII、廓线、P2P、直线+IK、扩展 API）
 
 编译运行：
 
@@ -61,6 +63,8 @@ make ctest          # 等价 cd src && make run
 # 或直接
 cd src && make run
 ```
+
+> 扩展方法（换机型限位、新增协议命令、新增轨迹类型、新增模块等）见 [docs/extending.md](docs/extending.md)。
 
 ## 目录结构
 
