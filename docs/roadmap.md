@@ -29,3 +29,4 @@
 |---|---|
 | 2026-08-18 | 导出兼容补丁 `patch-20260818-84453f1.patch`，包含 GCC 13 `<stdint.h>` 与 `MPU6050.hpp` 大小写修复；测试 dry-run 与 clean build 全部通过 |
 | 2026-08-18 | 新增 `src/` 运动学/协议/轨迹基础库与 8 组单元测试（全部通过）：6-DOF FK、8 分支解析 IK（含奇异保护）、二进制帧+CRC16/流式解析/ASCII 协议、梯形速度廓线、关节 P2P 同步、笛卡尔直线+连续 IK。为 M3 联调运动打下软件基础 |
+| 2026-08-20 | P0 协议补齐：`src/protocol.c:281` 新增 `CMD_SET_CARTESIAN_POS` 等 7 命令对称 unpack（`src/protocol.h:134`）+ thunk 登记表 `PROTOCOL_CMD_TABLE:530` 去除全部 `-3` 未实现；`src/main.c:543` 重构 TEST10 并新增 TEST11 笛卡尔/轻量命令来回验证（误差 <1e-4），`make ctest` 10→11 组 100% 通过，零警告 |

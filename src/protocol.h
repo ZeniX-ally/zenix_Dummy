@@ -131,6 +131,13 @@ int protocol_unpack_frame(const uint8_t *buf, size_t len, checksum_type_t chk_ty
                           protocol_frame_t *out_frame);
 int protocol_unpack_set_joint_pos(const protocol_frame_t *frame, cmd_set_joint_pos_t *out_cmd);
 int protocol_unpack_status_report(const protocol_frame_t *frame, report_status_payload_t *out_status);
+int protocol_unpack_set_cartesian_pos(const protocol_frame_t *frame, cmd_set_cartesian_pos_t *out_cmd);
+int protocol_unpack_ping(const protocol_frame_t *frame, void *out_data);
+int protocol_unpack_emergency_stop(const protocol_frame_t *frame, void *out_data);
+int protocol_unpack_set_enable(const protocol_frame_t *frame, bool *out_enable);
+int protocol_unpack_get_status(const protocol_frame_t *frame, void *out_data);
+int protocol_unpack_ack(const protocol_frame_t *frame, void *out_data);
+int protocol_unpack_nack(const protocol_frame_t *frame, void *out_data);
 
 /* ---------- 边界安全序列化 / 反序列化流 ----------
  * 用于在 frame->payload 与 struct 之间编解码。

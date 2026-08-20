@@ -593,17 +593,45 @@ static int test_extensibility_protocol(void) {
     TEST_ASSERT(fabsf(decoded.speed - 12.5f) < 1e-4f, "dispatched speed");
     TEST_ASSERT(fabsf(decoded.gripper - 0.75f) < 1e-4f, "dispatched gripper");
 
-    /* 未登记命令 -> -1；已登记但未实现钩子 -> -3；载荷过短 -> -2 */
+    /* 未登记命令 -> -1；载荷过短 -> -2；已实现钩子应返回 0/-2 不再 -3 */
     protocol_frame_t unknown;
     memset(&unknown, 0, sizeof(unknown));
     unknown.cmd = (protocol_cmd_t)0x55;
     TEST_ASSERT(protocol_unpack_command(&unknown, NULL) == -1, "unknown cmd dispatch");
 
-    protocol_frame_t notimpl;
-    memset(&notimpl, 0, sizeof(notimpl));
-    notimpl.cmd = CMD_SET_CARTESIAN_POS;
-    notimpl.payload_len = (6 + 2) * (uint8_t)sizeof(float);
-    TEST_ASSERT(protocol_unpack_command(&notimpl, NULL) == -3, "not-implemented hook dispatch");
+    /* 10.3 CMD_SET_CARTESIAN_POS pack→unpack 来回误差 <1e-4 */
+    {
+        cmd_set_cartesian_pos_t cart_tx = {
+            .pose = { .x = 120.0f, .y = -50.0f, .z = 210.0f, .roll = 10.0f, .pitch = -20.0f, .yaw = 30.0f },
+            .speed = 55.5f,
+            .gripper = 0.65f
+        };
+        uint8_t cpacked[64];
+        int clen = protocol_pack_set_cartesian_pos(0x22, &cart_tx, CHECKSUM_CRC16, cpacked, sizeof(cpacked));
+        TEST_ASSERT(clen > 0, "pack cartesian");
+        protocol_frame_t cframe;
+        TEST_ASSERT(protocol_unpack_frame(cpacked, (size_t)clen, CHECKSUM_CRC16, &cframe) == 0, "unpack frame cartesian");
+        cmd_set_cartesian_pos_t cart_rx;
+        TEST_ASSERT(protocol_unpack_command(&cframe, &cart_rx) == 0, "dispatch cartesian");
+        TEST_ASSERT(fabsf(cart_rx.pose.x - cart_tx.pose.x) < 1e-4f, "cart x mismatch");
+        TEST_ASSERT(fabsf(cart_rx.pose.y - cart_tx.pose.y) < 1e-4f, "cart y mismatch");
+        TEST_ASSERT(fabsf(cart_rx.pose.z - cart_tx.pose.z) < 1e-4f, "cart z mismatch");
+        TEST_ASSERT(fabsf(cart_rx.pose.roll - cart_tx.pose.roll) < 1e-4f, "cart roll mismatch");
+        TEST_ASSERT(fabsf(cart_rx.pose.pitch - cart_tx.pose.pitch) < 1e-4f, "cart pitch mismatch");
+        TEST_ASSERT(fabsf(cart_rx.pose.yaw - cart_tx.pose.yaw) < 1e-4f, "cart yaw mismatch");
+        TEST_ASSERT(fabsf(cart_rx.speed - cart_tx.speed) < 1e-4f, "cart speed mismatch");
+        TEST_ASSERT(fabsf(cart_rx.gripper - cart_tx.gripper) < 1e-4f, "cart gripper mismatch");
+        printf("  Cartesian pack->unpack roundtrip OK (CRC16)\n");
+
+        /* 篡改 payload_len 触发 -2 */
+        protocol_frame_t short_cart;
+        memset(&short_cart, 0, sizeof(short_cart));
+        short_cart.cmd = CMD_SET_CARTESIAN_POS;
+        short_cart.payload_len = 1; /* 过短 */
+        TEST_ASSERT(protocol_unpack_command(&short_cart, NULL) == -2, "short cartesian payload dispatch");
+        /* 直接调用 unpack 也应返回 -2 */
+        TEST_ASSERT(protocol_unpack_set_cartesian_pos(&short_cart, &cart_rx) == -2, "direct unpack cartesian short");
+    }
 
     protocol_frame_t shortf;
     memset(&shortf, 0, sizeof(shortf));
@@ -611,7 +639,213 @@ static int test_extensibility_protocol(void) {
     shortf.payload_len = 1; /* 过短 */
     TEST_ASSERT(protocol_unpack_command(&shortf, NULL) == -2, "short payload dispatch");
 
+    /* 10.4 轻量命令: 0 载荷正常 + 篡改 payload_len 触发 -2 (set_enable 为 bool 载荷 1 字节) */
+    {
+        /* PING */
+        protocol_frame_t pf;
+        memset(&pf, 0, sizeof(pf));
+        pf.seq = 0xA1; pf.cmd = CMD_PING; pf.payload_len = 0;
+        uint8_t pbuf[16];
+        int plen = protocol_pack_frame(&pf, CHECKSUM_CRC16, pbuf, sizeof(pbuf));
+        TEST_ASSERT(plen > 0, "pack ping");
+        protocol_frame_t prx;
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_CRC16, &prx) == 0, "unpack ping frame");
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == 0, "dispatch ping");
+        prx.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "ping tamper len 1 -> -2");
+
+        /* EMERGENCY_STOP */
+        memset(&pf, 0, sizeof(pf));
+        pf.seq = 0xA2; pf.cmd = CMD_EMERGENCY_STOP; pf.payload_len = 0;
+        plen = protocol_pack_frame(&pf, CHECKSUM_SUM8, pbuf, sizeof(pbuf));
+        TEST_ASSERT(plen > 0, "pack estop");
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_SUM8, &prx) == 0, "unpack estop");
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == 0, "dispatch estop");
+        prx.payload_len = 2;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "estop tamper");
+
+        /* SET_ENABLE (bool 载荷 1 字节) */
+        protocol_frame_t ef;
+        memset(&ef, 0, sizeof(ef));
+        ef.seq = 0xA3; ef.cmd = CMD_SET_ENABLE; ef.payload_len = 1; ef.payload[0] = 1;
+        plen = protocol_pack_frame(&ef, CHECKSUM_CRC16, pbuf, sizeof(pbuf));
+        TEST_ASSERT(plen > 0, "pack set_enable");
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_CRC16, &prx) == 0, "unpack set_enable frame");
+        bool en_out = false;
+        TEST_ASSERT(protocol_unpack_command(&prx, &en_out) == 0 && en_out == true, "dispatch set_enable true");
+        /* false case */
+        ef.payload[0] = 0;
+        plen = protocol_pack_frame(&ef, CHECKSUM_CRC16, pbuf, sizeof(pbuf));
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_CRC16, &prx) == 0, "unpack set_enable false frame");
+        TEST_ASSERT(protocol_unpack_command(&prx, &en_out) == 0 && en_out == false, "dispatch set_enable false");
+        /* 篡改 len 0 -> -2 , len 2 -> -2 */
+        prx.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "set_enable tamper len 0 -> -2");
+        prx.payload_len = 2;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "set_enable tamper len 2 -> -2");
+
+        /* GET_STATUS */
+        memset(&pf, 0, sizeof(pf));
+        pf.seq = 0xA4; pf.cmd = CMD_GET_STATUS; pf.payload_len = 0;
+        plen = protocol_pack_frame(&pf, CHECKSUM_CRC16, pbuf, sizeof(pbuf));
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_CRC16, &prx) == 0, "unpack get_status");
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == 0, "dispatch get_status");
+        prx.payload_len = 5;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "get_status tamper");
+
+        /* ACK */
+        memset(&pf, 0, sizeof(pf));
+        pf.seq = 0xA5; pf.cmd = CMD_ACK; pf.payload_len = 0;
+        plen = protocol_pack_frame(&pf, CHECKSUM_SUM8, pbuf, sizeof(pbuf));
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_SUM8, &prx) == 0, "unpack ack");
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == 0, "dispatch ack");
+        prx.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "ack tamper");
+
+        /* NACK */
+        memset(&pf, 0, sizeof(pf));
+        pf.seq = 0xA6; pf.cmd = CMD_NACK; pf.payload_len = 0;
+        plen = protocol_pack_frame(&pf, CHECKSUM_CRC16, pbuf, sizeof(pbuf));
+        TEST_ASSERT(protocol_unpack_frame(pbuf, (size_t)plen, CHECKSUM_CRC16, &prx) == 0, "unpack nack");
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == 0, "dispatch nack");
+        prx.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_command(&prx, NULL) == -2, "nack tamper");
+
+        printf("  Light commands (ping/estop/enable/get_status/ack/nack) pack->unpack + tamper checks OK\n");
+    }
+
     printf("  Serializer stream + command registry PASSED.\n\n");
+    return 0;
+}
+
+/* 测试 11: 笛卡尔与轻量命令完整来回 + 限位不受影响 */
+static int test_protocol_cartesian_light_roundtrip(void) {
+    printf("--- [TEST 11] Protocol Cartesian & Light Commands Roundtrip ---\n");
+
+    /* 11.1 登记表完整性: 9 条已登记，无 NULL 钩子 */
+    TEST_ASSERT(protocol_cmd_count() == 9, "cmd count should be 9");
+    const protocol_cmd_t all_cmds[] = { CMD_PING, CMD_EMERGENCY_STOP, CMD_SET_ENABLE, CMD_SET_JOINT_POS, CMD_SET_CARTESIAN_POS, CMD_GET_STATUS, CMD_REPORT_STATUS, CMD_ACK, CMD_NACK };
+    for (size_t i = 0; i < sizeof(all_cmds)/sizeof(all_cmds[0]); i++) {
+        const protocol_cmd_info_t *inf = protocol_cmd_lookup(all_cmds[i]);
+        TEST_ASSERT(inf != NULL, "lookup all cmds");
+        TEST_ASSERT(inf->unpack != NULL, "unpack hook not NULL");
+    }
+    TEST_ASSERT(protocol_cmd_lookup((protocol_cmd_t)0xFF) == NULL, "unknown lookup NULL");
+
+    /* 11.2 笛卡尔多姿态来回 (CRC16 + SUM8) */
+    cmd_set_cartesian_pos_t poses[] = {
+        { .pose = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }, .speed = 0.0f, .gripper = 0.0f },
+        { .pose = { 300.0f, -200.0f, 150.0f, 90.0f, -90.0f, 180.0f }, .speed = 100.0f, .gripper = 1.0f },
+        { .pose = { -100.5f, 50.25f, 75.125f, -45.0f, 45.0f, -30.0f }, .speed = 12.345f, .gripper = 0.5f },
+    };
+    checksum_type_t chks[] = { CHECKSUM_CRC16, CHECKSUM_SUM8 };
+    for (size_t pi = 0; pi < sizeof(poses)/sizeof(poses[0]); pi++) {
+        for (size_t ci = 0; ci < 2; ci++) {
+            uint8_t buf[64];
+            int len = protocol_pack_set_cartesian_pos((uint8_t)(0x30 + pi), &poses[pi], chks[ci], buf, sizeof(buf));
+            TEST_ASSERT(len > 0, "pack cartesian multi");
+            protocol_frame_t fr;
+            TEST_ASSERT(protocol_unpack_frame(buf, (size_t)len, chks[ci], &fr) == 0, "unpack frame cartesian multi");
+            cmd_set_cartesian_pos_t out;
+            int rc = protocol_unpack_command(&fr, &out);
+            TEST_ASSERT(rc == 0, "dispatch cartesian multi");
+            TEST_ASSERT(fabsf(out.pose.x - poses[pi].pose.x) < 1e-4f, "pose x multi");
+            TEST_ASSERT(fabsf(out.pose.y - poses[pi].pose.y) < 1e-4f, "pose y multi");
+            TEST_ASSERT(fabsf(out.pose.z - poses[pi].pose.z) < 1e-4f, "pose z multi");
+            TEST_ASSERT(fabsf(out.pose.roll - poses[pi].pose.roll) < 1e-4f, "pose roll multi");
+            TEST_ASSERT(fabsf(out.pose.pitch - poses[pi].pose.pitch) < 1e-4f, "pose pitch multi");
+            TEST_ASSERT(fabsf(out.pose.yaw - poses[pi].pose.yaw) < 1e-4f, "pose yaw multi");
+            TEST_ASSERT(fabsf(out.speed - poses[pi].speed) < 1e-4f, "speed multi");
+            TEST_ASSERT(fabsf(out.gripper - poses[pi].gripper) < 1e-4f, "gripper multi");
+            /* 直接调用 unpack 也应成功 */
+            cmd_set_cartesian_pos_t out2;
+            TEST_ASSERT(protocol_unpack_set_cartesian_pos(&fr, &out2) == 0, "direct unpack cartesian");
+            TEST_ASSERT(fabsf(out2.pose.x - poses[pi].pose.x) < 1e-4f, "direct unpack x");
+
+            /* 边界: payload_len 篡改 -> -2 */
+            protocol_frame_t bad = fr;
+            bad.payload_len = (uint8_t)(fr.payload_len - 1);
+            TEST_ASSERT(protocol_unpack_command(&bad, &out) == -2, "cartesian short tamper");
+            TEST_ASSERT(protocol_unpack_set_cartesian_pos(&bad, &out) == -2, "direct short tamper");
+            /* 读写越界: 空指针 -> -1 */
+            TEST_ASSERT(protocol_unpack_set_cartesian_pos(NULL, &out) == -1, "cartesian null frame");
+            TEST_ASSERT(protocol_unpack_set_cartesian_pos(&fr, NULL) == -1, "cartesian null out");
+        }
+    }
+    printf("  Cartesian multi-pose roundtrip OK (both checksums, error <1e-4)\n");
+
+    /* 11.3 轻量命令直接 unpack + 分发中心双路径验证 */
+    {
+        protocol_frame_t f;
+        /* ping direct */
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_PING; f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_ping(&f, NULL) == 0, "direct ping ok");
+        f.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_ping(&f, NULL) == -2, "direct ping tamper");
+        TEST_ASSERT(protocol_unpack_ping(NULL, NULL) == -1, "direct ping null");
+
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_EMERGENCY_STOP; f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_emergency_stop(&f, NULL) == 0, "direct estop ok");
+        f.payload_len = 3;
+        TEST_ASSERT(protocol_unpack_emergency_stop(&f, NULL) == -2, "direct estop tamper");
+
+        /* set_enable direct bool */
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_SET_ENABLE; f.payload_len = 1; f.payload[0] = 0x01;
+        bool be = false;
+        TEST_ASSERT(protocol_unpack_set_enable(&f, &be) == 0 && be == true, "direct set_enable true");
+        f.payload[0] = 0x00;
+        TEST_ASSERT(protocol_unpack_set_enable(&f, &be) == 0 && be == false, "direct set_enable false");
+        f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_set_enable(&f, &be) == -2, "direct set_enable short");
+        TEST_ASSERT(protocol_unpack_set_enable(NULL, &be) == -1, "direct set_enable null frame");
+        /* NULL out_enable 仍应返回 0 当 len 正确 */
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_SET_ENABLE; f.payload_len = 1; f.payload[0] = 1;
+        TEST_ASSERT(protocol_unpack_set_enable(&f, NULL) == 0, "direct set_enable null out but len ok");
+
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_GET_STATUS; f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_get_status(&f, NULL) == 0, "direct get_status ok");
+        f.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_get_status(&f, NULL) == -2, "direct get_status tamper");
+
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_ACK; f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_ack(&f, NULL) == 0, "direct ack ok");
+        f.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_ack(&f, NULL) == -2, "direct ack tamper");
+
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_NACK; f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_nack(&f, NULL) == 0, "direct nack ok");
+        f.payload_len = 1;
+        TEST_ASSERT(protocol_unpack_nack(&f, NULL) == -2, "direct nack tamper");
+
+        /* 分发中心对轻量命令同样返回 0/-2 不再 -3 */
+        protocol_cmd_t light[] = { CMD_PING, CMD_EMERGENCY_STOP, CMD_GET_STATUS, CMD_ACK, CMD_NACK };
+        for (size_t i = 0; i < sizeof(light)/sizeof(light[0]); i++) {
+            memset(&f, 0, sizeof(f)); f.cmd = light[i]; f.payload_len = 0;
+            TEST_ASSERT(protocol_unpack_command(&f, NULL) == 0, "dispatch light ok");
+            f.payload_len = 1;
+            TEST_ASSERT(protocol_unpack_command(&f, NULL) == -2, "dispatch light tamper");
+        }
+        memset(&f, 0, sizeof(f)); f.cmd = CMD_SET_ENABLE; f.payload_len = 1; f.payload[0]=1;
+        bool tmp;
+        TEST_ASSERT(protocol_unpack_command(&f, &tmp) == 0, "dispatch set_enable ok");
+        f.payload_len = 0;
+        TEST_ASSERT(protocol_unpack_command(&f, &tmp) == -2, "dispatch set_enable tamper 0");
+        printf("  Light commands direct+dispatch OK (0/ -2, no -3)\n");
+    }
+
+    /* 11.4 限位逻辑不受影响: 恢复默认后检查 is_joint_within_limits / clamp */
+    {
+        joint_limits_t def = kinematics_get_default_limits();
+        TEST_ASSERT(kinematics_set_limits(&def) == 0, "restore limits for check");
+        TEST_ASSERT(is_joint_within_limits(0, 0.0f) == true, "within limits");
+        TEST_ASSERT(is_joint_within_limits(0, 200.0f) == false, "exceed limits");
+        joint_state_t js = { .angles = { 200.0f, -200.0f, 0.0f, 0.0f, 0.0f, 0.0f } };
+        clamp_joint_angles(&js);
+        TEST_ASSERT(js.angles[0] <= 180.0f && js.angles[0] >= -180.0f, "clamp still works");
+        printf("  Joint limits logic unaffected (is_joint_within_limits/clamp OK)\n");
+    }
+
+    printf("  -> Cartesian & Light Commands roundtrip test PASSED.\n\n");
     return 0;
 }
 
@@ -630,9 +864,10 @@ int main(void) {
     if (test_trajectory_line_ik() != 0) return 1;
     if (test_extensibility_kinematics() != 0) return 1;
     if (test_extensibility_protocol() != 0) return 1;
+    if (test_protocol_cartesian_light_roundtrip() != 0) return 1;
 
     printf("====================================================\n");
-    printf("   ALL 10 TEST SUITES PASSED SUCCESSFULLY! (100%%)  \n");
+    printf("   ALL 11 TEST SUITES PASSED SUCCESSFULLY! (100%%)  \n");
     printf("====================================================\n");
     return 0;
 }

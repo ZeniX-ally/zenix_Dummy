@@ -278,6 +278,75 @@ int protocol_unpack_status_report(const protocol_frame_t *frame, report_status_p
     return 0;
 }
 
+int protocol_unpack_set_cartesian_pos(const protocol_frame_t *frame, cmd_set_cartesian_pos_t *out_cmd) {
+    if (!frame || !out_cmd) return -1;
+    if (frame->cmd != CMD_SET_CARTESIAN_POS) return -1;
+    if (frame->payload_len != (6 + 2) * sizeof(float)) return -2;
+    proto_reader_t r;
+    proto_reader_init(&r, frame->payload, frame->payload_len);
+    if (proto_reader_f32(&r, &out_cmd->pose.x)     != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->pose.y)     != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->pose.z)     != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->pose.roll)  != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->pose.pitch) != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->pose.yaw)   != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->speed)      != 0) return -1;
+    if (proto_reader_f32(&r, &out_cmd->gripper)    != 0) return -1;
+    return 0;
+}
+
+int protocol_unpack_ping(const protocol_frame_t *frame, void *out_data) {
+    (void)out_data;
+    if (!frame) return -1;
+    if (frame->cmd != CMD_PING) return -1;
+    if (frame->payload_len != 0) return -2;
+    return 0;
+}
+
+int protocol_unpack_emergency_stop(const protocol_frame_t *frame, void *out_data) {
+    (void)out_data;
+    if (!frame) return -1;
+    if (frame->cmd != CMD_EMERGENCY_STOP) return -1;
+    if (frame->payload_len != 0) return -2;
+    return 0;
+}
+
+int protocol_unpack_set_enable(const protocol_frame_t *frame, bool *out_enable) {
+    if (!frame) return -1;
+    if (frame->cmd != CMD_SET_ENABLE) return -1;
+    if (frame->payload_len != 1) return -2;
+    proto_reader_t r;
+    proto_reader_init(&r, frame->payload, frame->payload_len);
+    uint8_t v = 0;
+    if (proto_reader_u8(&r, &v) != 0) return -2;
+    if (out_enable) *out_enable = (v != 0);
+    return 0;
+}
+
+int protocol_unpack_get_status(const protocol_frame_t *frame, void *out_data) {
+    (void)out_data;
+    if (!frame) return -1;
+    if (frame->cmd != CMD_GET_STATUS) return -1;
+    if (frame->payload_len != 0) return -2;
+    return 0;
+}
+
+int protocol_unpack_ack(const protocol_frame_t *frame, void *out_data) {
+    (void)out_data;
+    if (!frame) return -1;
+    if (frame->cmd != CMD_ACK) return -1;
+    if (frame->payload_len != 0) return -2;
+    return 0;
+}
+
+int protocol_unpack_nack(const protocol_frame_t *frame, void *out_data) {
+    (void)out_data;
+    if (!frame) return -1;
+    if (frame->cmd != CMD_NACK) return -1;
+    if (frame->payload_len != 0) return -2;
+    return 0;
+}
+
 /* ----------------- 解包与流式状态机解析 ----------------- */
 
 int protocol_unpack_frame(const uint8_t *buf, size_t len, checksum_type_t chk_type,
@@ -430,16 +499,44 @@ static int unpack_status_report_thunk(const protocol_frame_t *frame, void *out_d
     return protocol_unpack_status_report(frame, (report_status_payload_t *)out_data);
 }
 
+static int unpack_set_cartesian_pos_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_set_cartesian_pos(frame, (cmd_set_cartesian_pos_t *)out_data);
+}
+
+static int unpack_ping_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_ping(frame, out_data);
+}
+
+static int unpack_emergency_stop_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_emergency_stop(frame, out_data);
+}
+
+static int unpack_set_enable_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_set_enable(frame, (bool *)out_data);
+}
+
+static int unpack_get_status_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_get_status(frame, out_data);
+}
+
+static int unpack_ack_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_ack(frame, out_data);
+}
+
+static int unpack_nack_thunk(const protocol_frame_t *frame, void *out_data) {
+    return protocol_unpack_nack(frame, out_data);
+}
+
 static const protocol_cmd_info_t PROTOCOL_CMD_TABLE[] = {
-    { CMD_PING,              "ping",                0,                                        NULL },
-    { CMD_EMERGENCY_STOP,    "emergency_stop",      0,                                        NULL },
-    { CMD_SET_ENABLE,        "set_enable",          0,                                        NULL },
+    { CMD_PING,              "ping",                0,                                        unpack_ping_thunk },
+    { CMD_EMERGENCY_STOP,    "emergency_stop",      0,                                        unpack_emergency_stop_thunk },
+    { CMD_SET_ENABLE,        "set_enable",          1,                                        unpack_set_enable_thunk },
     { CMD_SET_JOINT_POS,     "set_joint_pos",       (NUM_JOINTS + 2)        * (uint16_t)sizeof(float), unpack_set_joint_pos_thunk },
-    { CMD_SET_CARTESIAN_POS, "set_cartesian_pos",   (6 + 2)                 * (uint16_t)sizeof(float), NULL },
-    { CMD_GET_STATUS,        "get_status",          0,                                        NULL },
+    { CMD_SET_CARTESIAN_POS, "set_cartesian_pos",   (6 + 2)                 * (uint16_t)sizeof(float), unpack_set_cartesian_pos_thunk },
+    { CMD_GET_STATUS,        "get_status",          0,                                        unpack_get_status_thunk },
     { CMD_REPORT_STATUS,     "report_status",       1 + 1 + 2 + (NUM_JOINTS + 6 + 1) * (uint16_t)sizeof(float), unpack_status_report_thunk },
-    { CMD_ACK,               "ack",                 0,                                        NULL },
-    { CMD_NACK,              "nack",                0,                                        NULL },
+    { CMD_ACK,               "ack",                 0,                                        unpack_ack_thunk },
+    { CMD_NACK,              "nack",                0,                                        unpack_nack_thunk },
     { (protocol_cmd_t)0,     NULL,                  0,                                        NULL } /* 哨兵 */
 };
 
