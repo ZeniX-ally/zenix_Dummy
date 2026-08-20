@@ -47,10 +47,12 @@
 
 ## 基础 C 程序
 
-位于 `src/`，是一个桌面机械臂运动学基础示例（与项目主题贴合）：
+位于 `src/`，是一个桌面机械臂运动学/通信/轨迹基础示例（与项目主题贴合）：
 
-- `src/kinematics.h` / `src/kinematics.c`：关节角度归一化、限位校验、夹爪钳位、简易正运动学
-- `src/main.c`：演示上述功能
+- `src/kinematics.h` / `src/kinematics.c`：关节角度归一化、限位校验、夹爪钳位、6-DOF 正运动学、8 分支解析逆运动学（含奇异点保护）
+- `src/protocol.h` / `src/protocol.c`：二进制帧打包/解包（Sum8/CRC16 校验）、流式状态机解析器、ASCII 命令编码（兼容上位机 CLI）
+- `src/trajectory.h` / `src/trajectory.c`：梯形速度廓线、关节空间点对点同步运动、笛卡尔直线运动 + 连续 IK 分支跟踪
+- `src/main.c`：8 组单元测试（FK/IK 闭环、多解/奇异、协议校验、流式解析、ASCII、廓线、P2P、直线+IK）
 
 编译运行：
 

@@ -5,6 +5,7 @@
 #include <assert.h>
 #include "kinematics.h"
 #include "protocol.h"
+#include "trajectory.h"
 
 #define TEST_ASSERT(cond, msg) do { \
     if (!(cond)) { \
@@ -241,6 +242,193 @@ static int test_protocol_streaming_parser(void) {
     return 0;
 }
 
+/* 测试 6: 梯形速度廓线正确性测试 */
+static int test_trajectory_profile(void) {
+    printf("--- [TEST 6] Trapezoidal Velocity Profile Correctness ---\n");
+
+    /* 1. 典型梯形廓线（具备匀速段） */
+    traj_profile_t p = traj_profile_make(100.0f, 50.0f, 100.0f);
+    TEST_ASSERT(p.triangle == false, "Long move should be trapezoid");
+    TEST_ASSERT(fabsf(p.v_peak - 50.0f) < 1e-4f, "Peak velocity should reach vmax");
+    /* t_acc = v/a = 0.5s; t_cruise = (d - v^2/a)/v = (100-25)/50 = 1.5s; total = 2.5s */
+    TEST_ASSERT(fabsf(p.t_acc - 0.5f) < 1e-4f, "Accel time mismatch");
+    TEST_ASSERT(fabsf(p.t_cruise - 1.5f) < 1e-4f, "Cruise time mismatch");
+    TEST_ASSERT(fabsf(p.t_total - 2.5f) < 1e-4f, "Total time mismatch");
+
+    /* 端点正确性: 起点 0 终点 dist, 初末速度 0 */
+    float v = 0.0f;
+    float s0 = traj_profile_sample(&p, 0.0f, &v);
+    TEST_ASSERT(fabsf(s0) < 1e-4f && fabsf(v) < 1e-4f, "Start position/velocity should be 0");
+    float s_end = traj_profile_sample(&p, 10.0f, &v);
+    TEST_ASSERT(fabsf(s_end - 100.0f) < 1e-3f, "Endpoint position mismatch");
+    TEST_ASSERT(fabsf(v) < 1e-3f, "Endpoint velocity should be 0");
+
+    /* 峰值速度不超限 & 位移单调递增 */
+    float prev = 0.0f, vmax_seen = 0.0f;
+    for (int i = 1; i <= 50; i++) {
+        float t = i * 0.05f;
+        float sp = traj_profile_sample(&p, t, &v);
+        TEST_ASSERT(sp >= prev - 1e-3f, "Position should be monotonic");
+        if (fabsf(v) > vmax_seen) vmax_seen = fabsf(v);
+        prev = sp;
+    }
+    TEST_ASSERT(vmax_seen <= 50.0f + 1e-3f, "Velocity should never exceed vmax");
+
+    /* 2. 短位移三角廓线（达不到 vmax） */
+    traj_profile_t t2 = traj_profile_make(5.0f, 50.0f, 100.0f);
+    TEST_ASSERT(t2.triangle == true, "Short move should be triangle");
+    TEST_ASSERT(t2.v_peak < 50.0f, "Peak below vmax for triangle profile");
+    float s2_end = traj_profile_sample(&t2, 10.0f, &v);
+    TEST_ASSERT(fabsf(s2_end - 5.0f) < 1e-3f, "Triangle endpoint mismatch");
+    TEST_ASSERT(fabsf(v) < 1e-3f, "Triangle endpoint velocity should be 0");
+
+    /* 3. 负方向位移 */
+    traj_profile_t pn = traj_profile_make(-80.0f, 40.0f, 80.0f);
+    float sn_end = traj_profile_sample(&pn, 10.0f, &v);
+    TEST_ASSERT(fabsf(sn_end + 80.0f) < 1e-3f, "Negative endpoint mismatch");
+    TEST_ASSERT(fabsf(v) < 1e-3f, "Negative endpoint velocity should be 0");
+
+    printf("  Trapezoid: d=100 v=50 a=100 -> t_acc=%.3f t_cruise=%.3f t_total=%.3f (peak v=%.1f)\n",
+           p.t_acc, p.t_cruise, p.t_total, p.v_peak);
+    printf("  Triangle:  d=5   v=50 a=100 -> t_total=%.3f (peak v=%.1f)\n",
+           t2.t_total, t2.v_peak);
+    printf("  -> Trapezoidal profile test PASSED.\n\n");
+    return 0;
+}
+
+/* 测试 7: 关节空间点对点同步运动 */
+static int test_trajectory_joint_p2p(void) {
+    printf("--- [TEST 7] Joint-Space P2P Synchronized Motion ---\n");
+
+    /* 包含 170° -> -170° 的跨 180° 最短路径 (应走 +20° 而非 -340°) */
+    joint_state_t q0 = { .angles = {10.0f, 20.0f, -30.0f, 0.0f, 15.0f, 170.0f}, .gripper = 0.0f };
+    joint_state_t q1 = { .angles = {50.0f, 20.0f, -30.0f, 0.0f, 15.0f, -170.0f}, .gripper = 1.0f };
+
+    traj_joint_plan_t plan;
+    int rc = traj_joint_plan_init(&plan, &q0, &q1, 60.0f, 120.0f);
+    TEST_ASSERT(rc == 0, "Joint P2P plan init failed");
+
+    /* max_delta = J1: 40 deg; J6 最短路径 = +20 deg -> 关键轴为 J1 */
+    TEST_ASSERT(fabsf(plan.max_delta - 40.0f) < 1e-3f, "Critical axis should be J1 (40 deg)");
+    TEST_ASSERT(fabsf(plan.delta[5] - 20.0f) < 1e-3f, "J6 should take +20 deg shortcut");
+
+    /* 采样全程: 每个关节同步到达终点, 夹爪同步开合 */
+    const int N = 10;
+    joint_state_t prev;
+    float vel;
+    for (int i = 0; i <= N; i++) {
+        float t = plan.profile.t_total * i / N;
+        joint_state_t js;
+        traj_joint_plan_sample(&plan, t, &js, &vel);
+
+        if (i == 0) {
+            for (int j = 0; j < NUM_JOINTS; j++) {
+                TEST_ASSERT(fabsf(js.angles[j] - q0.angles[j]) < 1e-3f, "Start joints mismatch");
+            }
+            TEST_ASSERT(fabsf(js.gripper - 0.0f) < 1e-3f, "Start gripper mismatch");
+        }
+        if (i == N) {
+            for (int j = 0; j < NUM_JOINTS; j++) {
+                TEST_ASSERT(fabsf(js.angles[j] - q1.angles[j]) < 1e-3f, "End joints mismatch");
+            }
+            TEST_ASSERT(fabsf(js.gripper - 1.0f) < 1e-3f, "End gripper mismatch");
+            TEST_ASSERT(fabsf(vel) < 1e-3f, "End velocity should be 0");
+        } else if (i > 0) {
+            /* 检查连续性: 相邻采样关节差应远小于直接跳跃（用环绕差度量） */
+            float step = 0.0f;
+            for (int j = 0; j < NUM_JOINTS; j++) {
+                float d = fabsf(traj_angle_diff(prev.angles[j], js.angles[j]));
+                if (d > step) step = d;
+            }
+            TEST_ASSERT(step < 12.0f, "Joint step should be bounded");
+        }
+        prev = js;
+    }
+
+    /* 同步性验证: 某时刻所有已移动分数相等（用环绕差归一化相位） */
+    joint_state_t mid;
+    traj_joint_plan_sample(&plan, plan.profile.t_total * 0.5f, &mid, NULL);
+    float f_j1 = traj_angle_diff(q0.angles[0], mid.angles[0]) / 40.0f;
+    float f_j6 = traj_angle_diff(q0.angles[5], mid.angles[5]) / 20.0f;
+    TEST_ASSERT(fabsf(f_j1 - f_j6) < 0.01f, "All joints should move in sync");
+
+    printf("  P2P: J1 10->50 deg (40), J6 170->-170 deg (shortest +20), t_total=%.3fs\n",
+           plan.profile.t_total);
+    printf("  Mid-sampling: J1 frac=%.3f, J6 frac=%.3f (synced)\n", f_j1, f_j6);
+    printf("  -> Joint P2P synchronized motion test PASSED.\n\n");
+    return 0;
+}
+
+/* 测试 8: 笛卡尔直线运动 + 连续 IK 逆解 */
+static int test_trajectory_line_ik(void) {
+    printf("--- [TEST 8] Cartesian Line Motion + Continuous IK ---\n");
+
+    ik_config_t cfg = kinematics_get_default_config();
+
+    /* 从一非奇异姿态出发（home 全零会导致手腕中心落在 Z 轴奇异区） */
+    joint_state_t home = { .angles = {15.0f, 35.0f, -45.0f, 10.0f, 30.0f, 20.0f}, .gripper = 0.0f };
+    pose6d_t p_start, p_end;
+    kinematics_forward_6dof(&home, &cfg, &p_start);
+
+    p_end = p_start;
+    p_end.x += 60.0f;
+    p_end.y += 30.0f;
+    p_end.z -= 40.0f;   /* 向下压 */
+    p_end.pitch += 15.0f;
+
+    traj_line_plan_t plan;
+    int rc = traj_line_plan_init(&plan, &p_start, &p_end, 120.0f, 240.0f);
+    TEST_ASSERT(rc == 0, "Line plan init failed");
+    float path_len = plan.path_len;
+    TEST_ASSERT(fabsf(path_len - sqrtf(60*60 + 30*30 + 40*40)) < 1e-2f,
+                "Path length mismatch");
+
+    /* 遍历采样点: 每个点逆解 -> 正解, 验证沿直线且分支连续 */
+    joint_state_t last = home;
+    const int N = 20;
+    float max_pos_err = 0.0f, max_jump = 0.0f;
+
+    for (int i = 0; i <= N; i++) {
+        float t = plan.profile.t_total * i / N;
+        pose6d_t target;
+        traj_line_plan_sample(&plan, t, &target, NULL);
+
+        joint_state_t js;
+        ik_status_t ik_rc = traj_ik_closest(&target, &last, &cfg, &js);
+        TEST_ASSERT(ik_rc == IK_SUCCESS, "IK should succeed along reachable line");
+
+        /* 正解验证: 末端位置应贴住直线 */
+        pose6d_t fk;
+        kinematics_forward_6dof(&js, &cfg, &fk);
+        float dx = fk.x - target.x, dy = fk.y - target.y, dz = fk.z - target.z;
+        float err = sqrtf(dx*dx + dy*dy + dz*dz);
+        if (err > max_pos_err) max_pos_err = err;
+
+        if (i > 0) {
+            float jump = 0.0f;
+            for (int j = 0; j < NUM_JOINTS; j++) {
+                float d = fabsf(traj_angle_diff(last.angles[j], js.angles[j]));
+                if (d > jump) jump = d;
+            }
+            if (jump > max_jump) max_jump = jump;
+        }
+        last = js;
+    }
+
+    printf("  Line: (%.1f,%.1f,%.1f) -> (%.1f,%.1f,%.1f), len=%.1f mm, t_total=%.3fs\n",
+           p_start.x, p_start.y, p_start.z, p_end.x, p_end.y, p_end.z, path_len,
+           plan.profile.t_total);
+    printf("  Max FK position error along line: %.4f mm\n", max_pos_err);
+    printf("  Max joint jump between samples: %.3f deg\n", max_jump);
+
+    TEST_ASSERT(max_pos_err < 0.5f, "FK should track straight line within 0.5 mm");
+    TEST_ASSERT(max_jump < 10.0f, "IK branch should stay continuous along line");
+    TEST_ASSERT(plan.profile.v_peak <= 120.0f + 1e-3f, "Line speed should honor vmax");
+
+    printf("  -> Cartesian line + continuous IK test PASSED.\n\n");
+    return 0;
+}
+
 /* 测试 5: ASCII 命令行与上位机协议互通测试 */
 static int test_protocol_ascii(void) {
     printf("--- [TEST 5] Protocol ASCII String Encoding & Parsing Test ---\n");
@@ -275,9 +463,12 @@ int main(void) {
     if (test_protocol_pack_unpack() != 0) return 1;
     if (test_protocol_streaming_parser() != 0) return 1;
     if (test_protocol_ascii() != 0) return 1;
+    if (test_trajectory_profile() != 0) return 1;
+    if (test_trajectory_joint_p2p() != 0) return 1;
+    if (test_trajectory_line_ik() != 0) return 1;
 
     printf("====================================================\n");
-    printf("   ALL 5 TEST SUITES PASSED SUCCESSFULLY! (100%%)   \n");
+    printf("   ALL 8 TEST SUITES PASSED SUCCESSFULLY! (100%%)   \n");
     printf("====================================================\n");
     return 0;
 }

@@ -7,9 +7,9 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c11 -Wall -Wextra -O2 -pedantic
 TARGET  := zenix_dummy_demo
-SRCS    := main.c kinematics.c protocol.c
+SRCS    := main.c kinematics.c protocol.c trajectory.c
 OBJS    := $(SRCS:.c=.o)
-HEADERS := kinematics.h protocol.h
+HEADERS := kinematics.h protocol.h trajectory.h
 
 .PHONY: all run test clean
 
