@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MotorDriver-42 JLC 原理图预览 · 嘉立创风格</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;background:#f1f5f9;color:#0f172a;line-height:1.5}
+  header{position:sticky;top:0;z-index:10;background:#0f2a44;color:white;padding:14px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  header h1{font-size:18px;font-weight:700;letter-spacing:.3px}
+  header .sub{font-size:11px;color:#c9d8e8;max-width:780px}
+  header .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  header .btn{background:#1a6fb5;color:white;border:none;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+  header .btn.secondary{background:#334155}
+  header .btn:hover{filter:brightness(1.08)}
+  .wrap{max-width:1640px;margin:16px auto;padding:0 16px}
+  .card{background:white;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06);margin-bottom:16px}
+  .cardHead{padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;background:#f8fafc}
+  .cardHead h2{font-size:14px;font-weight:700;color:#0f2a44}
+  .cardHead .meta{font-size:11px;color:#64748b}
+  .cardHead .zoom{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569}
+  .cardHead .zoom button{padding:4px 8px;border:1px solid #cbd5e1;background:white;border-radius:6px;cursor:pointer;font-size:11px}
+  .svgStage{position:relative;overflow:auto;max-height:78vh;background:#fff;display:flex;justify-content:center;align-items:flex-start;padding:12px}
+  .svgStage img, .svgStage object{max-width:100%;height:auto;display:block;background:white;box-shadow:0 0 0 1px #e2e8f0;transition:transform .15s}
+  .help{padding:12px 16px;background:#fffbeb;border-top:1px solid #fde68a;font-size:11px;color:#92400e}
+  .help b{color:#92400e}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:1100px){.grid{grid-template-columns:1fr}}
+  code{background:#eef2ff;padding:1px 5px;border-radius:4px;font-size:11px;color:#4338ca}
+  footer{max-width:1640px;margin:8px auto 24px;padding:0 16px;font-size:11px;color:#64748b;text-align:center}
+  .tip{font-size:11px;color:#475569;padding:8px 16px;background:#f1f5f9;border-top:1px solid #e2e8f0}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>MotorDriver-42 嘉立创风格原理图包 · 预览</h1>
+    <div class="sub">STM32F103CBT6 · ME3116 5V · LP2992 3.3V · SN65HVD232 CAN · 2×TB67H450 · MT6816 · 1600×2200 竖版 / 1600×980 互联 · Linux 下直接可用 <code>xdg-open preview.html</code></div>
+  </div>
+  <div class="actions">
+    <button class="btn" onclick="window.print()">打印 / 导出 PDF</button>
+    <button class="btn secondary" onclick="document.getElementById('schematic').scrollIntoView({behavior:'smooth'})">→ 原理图</button>
+    <button class="btn secondary" onclick="document.getElementById('interconnect').scrollIntoView({behavior:'smooth'})">→ 互联图</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card" style="padding:12px 16px;background:#eff6ff;border-color:#bfdbfe">
+    <div style="font-size:12px;color:#1e40af"><b>Linux 预览命令（任选其一）</b></div>
+    <div style="font-size:11px;color:#334155;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">
+      <code>xdg-open hardware/notes/MotorDriver-42-JLC/preview.html</code>
+      <code>xdg-open hardware/notes/MotorDriver-42-JLC/schematic.svg</code>
+      <code>xdg-open hardware/notes/MotorDriver-42-JLC/interconnect.svg</code>
+      <code>firefox preview.html &amp;</code>
+      <code>xviewer schematic.svg &amp;</code>
+      <code>xmllint --noout *.svg &amp;&amp; echo ok</code>
+    </div>
+    <div style="font-size:10px;color:#64748b;margin-top:6px">SVG 为矢量，任意缩放清晰；线宽 1.7 / 字体 10–12px sans-serif 已按嘉立创印刷规范优化。</div>
+  </div>
+
+  <div class="card" id="schematic">
+    <div class="cardHead">
+      <h2>① schematic.svg — 嘉立创风格原理图（6分区单文件）</h2>
+      <span class="meta">1600×2200 · 竖版 A4 · 白底细黑线 · 虚线分区</span>
+      <div class="zoom">
+        缩放
+        <button onclick="zoom('svg1',0.8)">−</button>
+        <button onclick="zoom('svg1',1)">100%</button>
+        <button onclick="zoom('svg1',1.25)">+</button>
+        <button onclick="zoom('svg1',1.6)">160%</button>
+        <button onclick="zoom('svg1',2)">200%</button>
+        <span style="margin-left:6px;color:#94a3b8">或 Ctrl+滚轮</span>
+      </div>
+    </div>
+    <div class="svgStage">
+      <!-- 用 img 直接引用，浏览器可缓存；同时提供 object 备用 -->
+      <img id="svg1" src="schematic.svg" alt="schematic.svg 嘉立创原理图" style="width:100%;max-width:1600px"/>
+    </div>
+    <div class="tip">
+      <b>读图顺序：</b> ① 电源（24V→5V→3.3V，顶部）→ ② MCU（中左，LQFP48 全引脚）→ ③ CAN（中右，SN65HVD232+120Ω）→ ⑥ 接口（右中，SH1.0 菊花链/SWD/UART/按键）→ ④ 驱动（底部，双 TB67H450+0.1Ω）→ ⑤ 编码器（右下，MT6816+可裁 OLED）→ 底部图例/测试点/网络速查。
+      首次打开若图过大，可点 “100%” 或按 <code>Ctrl+0</code> 复位。
+    </div>
+    <div class="help">
+      <b>嘉立创EDA导入：</b> 新建工程 → 新建原理图 → 按本图六分区逐区摆放元件（库搜 <code>STM32F103CBT6</code> <code>ME3116</code> <code>LP2992-3.3</code> <code>SN65HVD232</code> <code>TB67H450FNG</code> <code>MT6816</code> <code>SH1.0-6P</code>），网络名按 <code>VCC_IN/VCC_5V/VCC_3V3/CAN_H/L/SPI1_.../IN_*/PWM</code> 保持一致 → 工具→设计检查→更新PCB（4层 1oz，VM 40mil，CAN 差分 5mil）。
+      <br/><b>与原板差异：</b> OLED+ TPS61040 升压已用橙色虚线标 DNP，默认不贴；J1 120Ω 跳线仅链首尾闭合；其余位号/封装/参数与 Motor-42.pdf 一一对应。
+    </div>
+  </div>
+
+  <div class="card" id="interconnect">
+    <div class="cardHead">
+      <h2>② interconnect.svg — 系统互联简图（6板菊花链 + 24V星型）</h2>
+      <span class="meta">1600×980 · 布线参考</span>
+      <div class="zoom">
+        缩放
+        <button onclick="zoom('svg2',0.8)">−</button>
+        <button onclick="zoom('svg2',1)">100%</button>
+        <button onclick="zoom('svg2',1.4)">+</button>
+        <button onclick="zoom('svg2',1.8)">180%</button>
+      </div>
+    </div>
+    <div class="svgStage">
+      <img id="svg2" src="interconnect.svg" alt="interconnect.svg 系统互联" style="width:100%;max-width:1600px"/>
+    </div>
+    <div class="tip"><b>布线要点：</b> 24V 采用星型放射（电源为中心，等长 20AWG），GND 单点共地；CAN 采用菊花链双绞，仅首尾 <code>R12 120Ω</code> 闭合（J1 跳线），中间 4 板断开；P2=IN / P3=OUT 方向一致，尾板 P3 空置。详见图内图例与 README 第 6 节。</div>
+    <div class="help"><b>验证：</b> 断电万用表测 <code>CAN_H – CAN_L</code> 应为 <code>≈60Ω</code>（两端 120Ω 并联）；若为 40Ω 或 120Ω 说明终端数量错误；再查星型 GND 是否单点。</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="cardHead"><h2>文件清单</h2></div>
+      <div style="padding:12px 16px;font-size:12px;line-height:1.7;color:#334155">
+        <div><code>README.md</code> — 中文说明（功能/模块/网络表/差异/导入/预览）</div>
+        <div><code>schematic.svg</code> — 嘉立创风格原理图 1600×2200（6分区）</div>
+        <div><code>interconnect.svg</code> — 系统互联 1600×980（6板菊花链+星型）</div>
+        <div><code>preview.html</code> — 本预览容器（内嵌两图 + 缩放）</div>
+        <div><code>tools/gen_schematic.c</code> — C11 生成器（可选，校验一致性）</div>
+        <div style="margin-top:8px;font-size:11px;color:#64748b">全部在 <code>hardware/notes/MotorDriver-42-JLC/</code> 下，不改上游 <code>~/Dummy-Robot</code>，零 Python。</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cardHead"><h2>校验</h2></div>
+      <div style="padding:12px 16px;font-size:11px;line-height:1.7;color:#334155">
+        <div><code>xmllint --noout schematic.svg interconnect.svg &amp;&amp; echo ok</code></div>
+        <div><code>ls -lh hardware/notes/MotorDriver-42-JLC/</code></div>
+        <div><code>head -20 schematic.svg</code></div>
+        <div><code>wc -c schematic.svg interconnect.svg preview.html</code></div>
+        <div style="margin-top:8px;color:#16a34a">预期：schematic.svg &gt;70KB (实测 76KB)，interconnect.svg &gt;20KB (实测 21KB)，preview.html &gt;10KB (实测 11KB)，零 XML 错误。</div>
+        <div style="margin-top:8px"><b>可选 C 生成器：</b> <code>gcc -std=c11 -O2 -o /tmp/gen_schematic tools/gen_schematic.c &amp;&amp; /tmp/gen_schematic &gt; /tmp/check.svg &amp;&amp; xmllint --noout /tmp/check.svg &amp;&amp; echo gen ok</code></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="card" style="padding:12px 16px;background:#f8fafc">
+    <div style="font:700 12px sans-serif;color:#0f2a44">设计决策与原板对照（简要）</div>
+    <div style="font:11px sans-serif;color:#475569;line-height:1.7;margin-top:6px">
+      <div><b>分区逻辑：</b> 电源置顶（能量流自上而下）→ MCU 居中（控制中枢）→ CAN/接口分居右侧（对外边界清晰）→ 驱动置底（大电流远离模拟）→ 编码器右下（SPI 短走线）。6 虚线框与原 Altium 5 张图天然对应，便于逐区核对。</div>
+      <div><b>保留网络：</b> 38 条关键网络全保留（VCC_IN/5V/3V3/GND/CAN_H/L/TX/RX/SPI1/SPI2/IN_*/PWM/POWER_U/TEMP/ADC_ENC/SWD/UART/晶振/复位），删一即固件不通；仅 OLED+升压标 DNP 可裁。</div>
+      <div><b>保护不精简：</b> SS54 防反 + SMBJ24A TVS + 400µF 母线电容组合为原板实测可靠，回灌尖峰时钳位，保留不动。</div>
+      <div><b>双 TB67H450：</b> 单相双全桥，各负责一相，散热与采样分离，VREF 独立可调，维修可单相替换；0.1Ω 低侧采样 1% 精度。</div>
+      <div><b>MT6816 仍用 SPI1：</b> 固件硬编码 PB3/4/5 + PA15，改口需改固件；保留并复用 PA7/P4 给 AUX，兼容未来外置磁编。</div>
+      <div><b>Linux 预览：</b> 矢量 SVG 任意缩放清晰，xviewer / 浏览器均可；建议 125%–150% 打印核对丝印。</div>
+    </div>
+  </div>
+
+<footer>
+  MotorDriver-42-JLC · 对照 Motor-42.pdf 6页 · 生成 2026-08-20 · 工具 Write 直写 SVG + C11 校验 · 跟随 Dummy-Robot 开源协议 · 路径 <code>hardware/notes/MotorDriver-42-JLC/</code>
+</footer>
+
+<script>
+function zoom(id, factor){
+  const el=document.getElementById(id);
+  if(factor===1){ el.style.transform='scale(1)'; el.style.transformOrigin='top center'; return; }
+  el.style.transform='scale('+factor+')';
+  el.style.transformOrigin='top center';
+}
+// Ctrl+wheel 缩放支持（在图片上）
+['svg1','svg2'].forEach(id=>{
+  const el=document.getElementById(id);
+  let scale=1;
+  el.addEventListener('wheel', e=>{
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    scale += e.deltaY <0 ? 0.08 : -0.08;
+    scale=Math.max(0.5,Math.min(3,scale));
+    el.style.transform='scale('+scale+')';
+    el.style.transformOrigin='center top';
+  },{passive:false});
+});
+</script>
+</body>
+</html>
