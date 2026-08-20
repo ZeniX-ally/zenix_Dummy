@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +48,14 @@ typedef struct {
     int   arm_config;/* 分支选择: 0=Elbow Up/Normal, 1=Elbow Down/Alt, -1=Auto/Closest */
 } ik_config_t;
 
+/* 关节软限位配置（单位：度 deg）—— 支持运行时可配置，便于扩展到不同机型
+ * 默认值见 kinematics_get_default_limits()，可通过 kinematics_set_limits() 覆盖，
+ * is_joint_within_limits() / clamp_joint_angles() 均遵循当前限位。 */
+typedef struct {
+    float min_deg[NUM_JOINTS];
+    float max_deg[NUM_JOINTS];
+} joint_limits_t;
+
 /* 逆运动学求解结果状态码 */
 typedef enum {
     IK_SUCCESS            = 0,  /* 求解成功 */
@@ -63,13 +72,35 @@ typedef struct {
     int count;
 } ik_solutions_t;
 
-/* 关节软限位检查与保护 */
+/* 多解择优策略（供 kinematics_select_solution() 使用）
+ *  - SOL_SELECT_MIN_SQUARED:    各轴角度平方和最小（默认求解器策略），遵循 cfg->arm_config 分支限定
+ *  - SOL_SELECT_CLOSEST_TO_LAST: 距 last_joints 最近（保证轨迹连续性），不限定 arm_config 分支
+ */
+typedef enum {
+    SOL_SELECT_MIN_SQUARED = 0,
+    SOL_SELECT_CLOSEST_TO_LAST = 1
+} solution_selector_t;
+
+/* 关节软限位检查与保护（遵循当前已配置的关节限位） */
 bool is_joint_within_limits(int joint_idx, float angle_deg);
 void clamp_joint_angles(joint_state_t *js);
 void clamp_gripper(joint_state_t *js);
 
 /* 默认几何参数初始化 */
 ik_config_t kinematics_get_default_config(void);
+
+/* 关节软限位：获取默认值 / 读取当前值 / 运行时覆盖（新增机型无需改源码）
+ *  limits 为 NULL 时返回默认限位并重置当前限位为默认。
+ * 返回 0 成功；limits 为 NULL 或数组越界返回 -1。 */
+joint_limits_t kinematics_get_default_limits(void);
+void kinematics_get_limits(joint_limits_t *out_limits);
+int  kinematics_set_limits(const joint_limits_t *limits);
+
+/* 角度工具（跨模块统一，见 common.h 的更低层实现） */
+float kinematics_wrap_degree(float deg);
+float kinematics_wrap_radian(float rad);
+float kinematics_deg_to_rad(float deg);
+float kinematics_rad_to_deg(float rad);
 
 /* 经典简化 3-DOF 几何正运动学（用于向后兼容） */
 int forward_kinematics(const joint_state_t *js, float link_len,
@@ -119,6 +150,22 @@ ik_status_t kinematics_inverse_geometric(float x, float y, float z,
 ik_status_t kinematics_inverse_6dof(const pose6d_t *target_pose,
                                    const ik_config_t *cfg,
                                    joint_state_t *out_js);
+
+/* 在 8 组解析解中按策略选取最优可行解（统一 6-DOF IK 与轨迹连续 IK 的选解逻辑）
+ *
+ * 输入: solves         kinmatics_inverse_all() 产出的全部 8 组解
+ * 输入: cfg            求解配置（NULL 时用默认；采用 SOL_SELECT_MIN_SQUARED 时 arm_config 生效）
+ * 输入: selector       择优策略（见 solution_selector_t）
+ * 输入: last_joints    仅 SOL_SELECT_CLOSEST_TO_LAST 需要，作为连续性参考；可为 NULL
+ * 输出: out_js         选中的关节角
+ * 返回: IK_SUCCESS / IK_ERR_OUT_OF_REACH / IK_ERR_JOINT_LIMIT（无解落入限位时返回，仍写出一个解）/
+ *       IK_ERR_INVALID_PARAM
+ */
+ik_status_t kinematics_select_solution(const ik_solutions_t *solves,
+                                       const ik_config_t *cfg,
+                                       solution_selector_t selector,
+                                       const joint_state_t *last_joints,
+                                       joint_state_t *out_js);
 
 #ifdef __cplusplus
 }

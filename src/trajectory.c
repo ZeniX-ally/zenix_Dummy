@@ -2,22 +2,18 @@
 #include <math.h>
 #include <string.h>
 
-/* 容差常量 */
-#define TRAJ_EPS 1e-6f
+/* 容差常量（与全项目统一） */
+#define TRAJ_EPS ZENIX_EPS_F32
 
-/* 角度差归一化到 (-180, 180] */
+/* 角度差归一化到 (-180, 180] —— 复用 common.h 的 zenix_angle_diff_deg，
+ * 保持公开符号 traj_angle_diff 兼容旧调用。 */
 float traj_angle_diff(float from_deg, float to_deg) {
-    float d = to_deg - from_deg;
-    while (d > 180.0f) d -= 360.0f;
-    while (d <= -180.0f) d += 360.0f;
-    return d;
+    return zenix_angle_diff_deg(from_deg, to_deg);
 }
 
 /* 角度归一化到 (-180, 180] */
 static float normalize_angle(float deg) {
-    while (deg > 180.0f) deg -= 360.0f;
-    while (deg <= -180.0f) deg += 360.0f;
-    return deg;
+    return zenix_wrap_degree(deg);
 }
 
 /* ---------------- 1-D 梯形速度廓线 ---------------- */
@@ -174,8 +170,9 @@ int traj_joint_plan_sample(const traj_joint_plan_t *plan, float t,
 
 /* ---------------- 笛卡尔空间直线运动 ---------------- */
 
+/* clamp_float: 复用 common.h 的 zenix_clampf */
 static float clamp_float(float v, float lo, float hi) {
-    return (v < lo) ? lo : ((v > hi) ? hi : v);
+    return zenix_clampf(v, lo, hi);
 }
 
 int traj_line_plan_init(traj_line_plan_t *plan,
@@ -250,55 +247,10 @@ ik_status_t traj_ik_closest(const pose6d_t *target,
     ik_status_t rc = kinematics_inverse_all(target, last_joints, &c, &solves);
     if (rc != IK_SUCCESS) return rc;
 
-    bool all_invalid = true;
-    for (int i = 0; i < 8; i++) {
-        if (solves.sol_flags[i][1] != 0) {
-            all_invalid = false;
-            break;
-        }
-    }
-    if (all_invalid) return IK_ERR_OUT_OF_REACH;
-
-    /* 选择"距 last_joints 最近"且在软限位内的解 */
-    int best_idx = -1;
-    float best_cost = 1e18f;
-    for (int i = 0; i < 8; i++) {
-        if (solves.sol_flags[i][1] == 0) continue;
-
-        bool within_limits = true;
-        for (int j = 0; j < NUM_JOINTS; j++) {
-            if (!is_joint_within_limits(j, solves.solutions[i].angles[j])) {
-                within_limits = false;
-                break;
-            }
-        }
-        if (!within_limits) continue;
-
-        float cost = 0.0f;
-        for (int j = 0; j < NUM_JOINTS; j++) {
-            float d = traj_angle_diff(last_joints->angles[j],
-                                      solves.solutions[i].angles[j]);
-            cost += d * d;
-        }
-        if (cost < best_cost) {
-            best_cost = cost;
-            best_idx = i;
-        }
-    }
-
-    if (best_idx < 0) {
-        /* 全部被软限位过滤：退回一个肘部有效解并标记限位错误 */
-        for (int i = 0; i < 8; i++) {
-            if (solves.sol_flags[i][1] != 0) {
-                *out_js = solves.solutions[i];
-                return IK_ERR_JOINT_LIMIT;
-            }
-        }
-        return IK_ERR_OUT_OF_REACH;
-    }
-
-    *out_js = solves.solutions[best_idx];
-    return IK_SUCCESS;
+    /* 与 6-DOF IK 共用同一套选解逻辑（策略: 距 last_joints 最近） */
+    return kinematics_select_solution(&solves, &c,
+                                      SOL_SELECT_CLOSEST_TO_LAST,
+                                      last_joints, out_js);
 }
 
 int traj_line_plan_sample_joints(const traj_line_plan_t *plan, float t,
@@ -310,10 +262,11 @@ int traj_line_plan_sample_joints(const traj_line_plan_t *plan, float t,
     pose6d_t pose;
     if (traj_line_plan_sample(plan, t, &pose, NULL) != 0) return -1;
 
-    if (!last) {
-        joint_state_t zero;
-        memset(&zero, 0, sizeof(zero));
-        last = &zero;
+    if (last) {
+        return (int)traj_ik_closest(&pose, last, cfg, out_js);
     }
-    return (int)traj_ik_closest(&pose, last, cfg, out_js);
+    /* 无历史状态：以零位为起始（不悬垂，消除 dangling-pointer 告警） */
+    joint_state_t zero;
+    memset(&zero, 0, sizeof(zero));
+    return (int)traj_ik_closest(&pose, &zero, cfg, out_js);
 }

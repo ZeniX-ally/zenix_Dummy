@@ -2,26 +2,74 @@
 #include <math.h>
 #include <string.h>
 
+/* 常量与角度工具统一取自 common.h（经 kinematics.h 引入）。
+ * 文件内保留 M_PI / 角度换算的轻量别名，避免大范围改动既有表达式。 */
 #ifndef M_PI
-#define M_PI 3.14159265358979323846
+#define M_PI ZENIX_PI
 #endif
 
 #ifndef M_PI_2
-#define M_PI_2 (M_PI / 2.0)
+#define M_PI_2 ZENIX_PI_2
 #endif
 
-#define DEG_TO_RAD(d) ((float)((d) * (M_PI / 180.0)))
-#define RAD_TO_DEG(r) ((float)((r) * (180.0 / M_PI)))
-#define EPSILON       1e-5f
+#define DEG_TO_RAD(d) zenix_deg_to_rad(d)
+#define RAD_TO_DEG(r) zenix_rad_to_deg(r)
+#define EPSILON       ZENIX_EPS_F32
 
-/* 关节软限位（度） */
-static const float JOINT_LIMITS_MIN[NUM_JOINTS] = {
-    -180.0f, -100.0f, -150.0f, -180.0f, -120.0f, -360.0f
-};
+/* ------------------ 关节软限位（运行时可配置） ------------------
+ * 默认限位定义在 default_joint_limits()，
+ * 通过 kinematics_set_limits() 即可为不同机型/关节覆盖，无需改源码。
+ * 所有限位相关接口（is_joint_within_limits / clamp_joint_angles）遵循当前值。 */
 
-static const float JOINT_LIMITS_MAX[NUM_JOINTS] = {
-    180.0f,  100.0f, 150.0f,  180.0f,  120.0f,  360.0f
-};
+static joint_limits_t g_kin_limits;       /* 当前生效限位 */
+static bool          g_kin_limits_init = false;
+
+static joint_limits_t default_joint_limits(void) {
+    static const float MIN_DEG[NUM_JOINTS] = {
+        -180.0f, -100.0f, -150.0f, -180.0f, -120.0f, -360.0f
+    };
+    static const float MAX_DEG[NUM_JOINTS] = {
+        180.0f,  100.0f, 150.0f,  180.0f,  120.0f,  360.0f
+    };
+    joint_limits_t lim;
+    for (int i = 0; i < NUM_JOINTS; i++) {
+        lim.min_deg[i] = MIN_DEG[i];
+        lim.max_deg[i] = MAX_DEG[i];
+    }
+    return lim;
+}
+
+static const joint_limits_t *current_limits(void) {
+    if (!g_kin_limits_init) {
+        g_kin_limits = default_joint_limits();
+        g_kin_limits_init = true;
+    }
+    return &g_kin_limits;
+}
+
+joint_limits_t kinematics_get_default_limits(void) {
+    return default_joint_limits();
+}
+
+void kinematics_get_limits(joint_limits_t *out_limits) {
+    if (out_limits) {
+        *out_limits = *current_limits();
+    }
+}
+
+int kinematics_set_limits(const joint_limits_t *limits) {
+    if (!limits) return -1;
+    g_kin_limits = *limits;
+    g_kin_limits_init = true;
+    return 0;
+}
+
+/* ------------------ 角度工具（统一入口） ------------------ */
+
+float kinematics_wrap_degree(float deg) { return zenix_wrap_degree(deg); }
+float kinematics_wrap_radian(float rad) { return zenix_wrap_radian(rad); }
+float kinematics_deg_to_rad(float deg)  { return zenix_deg_to_rad(deg); }
+float kinematics_rad_to_deg(float rad)  { return zenix_rad_to_deg(rad); }
 
 ik_config_t kinematics_get_default_config(void) {
     ik_config_t cfg;
@@ -39,17 +87,19 @@ bool is_joint_within_limits(int joint_idx, float angle_deg) {
     if (joint_idx < 0 || joint_idx >= NUM_JOINTS) {
         return false;
     }
-    return (angle_deg >= JOINT_LIMITS_MIN[joint_idx] - 1e-3f &&
-            angle_deg <= JOINT_LIMITS_MAX[joint_idx] + 1e-3f);
+    const joint_limits_t *lim = current_limits();
+    return (angle_deg >= lim->min_deg[joint_idx] - ZENIX_EPS_ANG &&
+            angle_deg <= lim->max_deg[joint_idx] + ZENIX_EPS_ANG);
 }
 
 void clamp_joint_angles(joint_state_t *js) {
     if (!js) return;
+    const joint_limits_t *lim = current_limits();
     for (int i = 0; i < NUM_JOINTS; i++) {
-        if (js->angles[i] < JOINT_LIMITS_MIN[i]) {
-            js->angles[i] = JOINT_LIMITS_MIN[i];
-        } else if (js->angles[i] > JOINT_LIMITS_MAX[i]) {
-            js->angles[i] = JOINT_LIMITS_MAX[i];
+        if (js->angles[i] < lim->min_deg[i]) {
+            js->angles[i] = lim->min_deg[i];
+        } else if (js->angles[i] > lim->max_deg[i]) {
+            js->angles[i] = lim->max_deg[i];
         }
     }
 }
@@ -72,6 +122,25 @@ int forward_kinematics(const joint_state_t *js, float link_len,
     *y = r * sinf(theta1);
     *z = link_len * (sinf(theta2) + sinf(theta2 + theta3));
     return 0;
+}
+
+/* ------------------ DH 参数表（单一事实来源） ------------------
+ * FK / IK 都从这里构建 Dummy 6-DOF DH 表，避免两处手写不一致。
+ * 匹配 Dummy Robot 6dof_kinematic 标定体系。 */
+typedef struct {
+    float theta0;  /* 关节零位偏移 (rad) */
+    float a;       /* 连杆长度 */
+    float d;       /* 连杆偏置 */
+    float alpha;   /* 连杆扭转 (rad) */
+} dh_link_t;
+
+static void build_dh_table(const ik_config_t *cfg, dh_link_t dh[6]) {
+    dh[0] = (dh_link_t){0.0f,            cfg->l_bs,  cfg->d_bs, -(float)M_PI_2};
+    dh[1] = (dh_link_t){-(float)M_PI_2,  0.0f,       cfg->l_arm, 0.0f};
+    dh[2] = (dh_link_t){(float)M_PI_2,   cfg->d_ew,  0.0f,       (float)M_PI_2};
+    dh[3] = (dh_link_t){0.0f,            cfg->l_fa,  0.0f,       -(float)M_PI_2};
+    dh[4] = (dh_link_t){0.0f,            0.0f,       0.0f,       (float)M_PI_2};
+    dh[5] = (dh_link_t){0.0f,            cfg->l_wt,  0.0f,       0.0f};
 }
 
 /* 矩阵乘法辅助 */
@@ -133,15 +202,9 @@ int kinematics_forward_6dof(const joint_state_t *js, const ik_config_t *cfg, pos
     if (!js || !out_pose) return -1;
     ik_config_t c = cfg ? *cfg : kinematics_get_default_config();
 
-    /* DH 矩阵常数与连杆偏置向量 (匹配 Dummy Robot 6dof_kinematic 标定体系) */
-    float dh[6][4] = {
-        {0.0f,            c.l_bs,  c.d_bs,  -(float)M_PI_2},
-        {-(float)M_PI_2,  0.0f,    c.l_arm, 0.0f},
-        {(float)M_PI_2,   c.d_ew,  0.0f,    (float)M_PI_2},
-        {0.0f,            c.l_fa,  0.0f,    -(float)M_PI_2},
-        {0.0f,            0.0f,    0.0f,    (float)M_PI_2},
-        {0.0f,            c.l_wt,  0.0f,    0.0f}
-    };
+    /* DH 参数单一来源（build_dh_table），与 IK 共用同一张表 */
+    dh_link_t dh[6];
+    build_dh_table(&c, dh);
 
     float l1_base[3] = { c.d_bs, -c.l_bs, 0.0f };
     float l2_arm[3]  = { c.l_arm, 0.0f, 0.0f };
@@ -151,9 +214,9 @@ int kinematics_forward_6dof(const joint_state_t *js, const ik_config_t *cfg, pos
     float q[6];
     float r_mats[6][9];
     for (int i = 0; i < 6; i++) {
-        q[i] = DEG_TO_RAD(js->angles[i]) + dh[i][0];
+        q[i] = DEG_TO_RAD(js->angles[i]) + dh[i].theta0;
         float cosq = cosf(q[i]), sinq = sinf(q[i]);
-        float cosa = cosf(dh[i][3]), sina = sinf(dh[i][3]);
+        float cosa = cosf(dh[i].alpha), sina = sinf(dh[i].alpha);
 
         r_mats[i][0] = cosq;
         r_mats[i][1] = -cosa * sinq;
@@ -208,14 +271,9 @@ ik_status_t kinematics_inverse_all(const pose6d_t *target_pose,
     memset(out_solves, 0, sizeof(ik_solutions_t));
     out_solves->count = 8;
 
-    float dh[6][4] = {
-        {0.0f,            c.l_bs,  c.d_bs,  -(float)M_PI_2},
-        {-(float)M_PI_2,  0.0f,    c.l_arm, 0.0f},
-        {(float)M_PI_2,   c.d_ew,  0.0f,    (float)M_PI_2},
-        {0.0f,            c.l_fa,  0.0f,    -(float)M_PI_2},
-        {0.0f,            0.0f,    0.0f,    (float)M_PI_2},
-        {0.0f,            c.l_wt,  0.0f,    0.0f}
-    };
+    /* DH 参数单一来源（build_dh_table），与 FK 共用同一张表 */
+    dh_link_t dh[6];
+    build_dh_table(&c, dh);
 
     float l1_base[3] = { c.d_bs, -c.l_bs, 0.0f };
     float l6_wrist[3]= { 0.0f, 0.0f, c.l_wt };
@@ -273,8 +331,8 @@ ik_status_t kinematics_inverse_all(const pose6d_t *target_pose,
     }
 
     for (int ind_arm = 0; ind_arm < 2; ind_arm++) {
-        float cosqs = cosf(qs[ind_arm] + dh[0][0]);
-        float sinqs = sinf(qs[ind_arm] + dh[0][0]);
+        float cosqs = cosf(qs[ind_arm] + dh[0].theta0);
+        float sinqs = sinf(qs[ind_arm] + dh[0].theta0);
 
         float r10[9] = {
             cosqs,  sinqs,  0.0f,
@@ -347,10 +405,10 @@ ik_status_t kinematics_inverse_all(const pose6d_t *target_pose,
         }
 
         for (int ind_elbow = 0; ind_elbow < 2; ind_elbow++) {
-            float cosqa0 = cosf(qa[ind_elbow][0] + dh[1][0]);
-            float sinqa0 = sinf(qa[ind_elbow][0] + dh[1][0]);
-            float cosqa1 = cosf(qa[ind_elbow][1] + dh[2][0]);
-            float sinqa1 = sinf(qa[ind_elbow][1] + dh[2][0]);
+            float cosqa0 = cosf(qa[ind_elbow][0] + dh[1].theta0);
+            float sinqa0 = sinf(qa[ind_elbow][0] + dh[1].theta0);
+            float cosqa1 = cosf(qa[ind_elbow][1] + dh[2].theta0);
+            float sinqa1 = sinf(qa[ind_elbow][1] + dh[2].theta0);
 
             float r31[9] = {
                 cosqa0 * cosqa1 - sinqa0 * sinqa1,  cosqa0 * sinqa1 + sinqa0 * cosqa1,  0.0f,
@@ -386,21 +444,21 @@ ik_status_t kinematics_inverse_all(const pose6d_t *target_pose,
                 /* 手腕奇异点保护 */
                 if (0 == ind_arm) {
                     qw[0][0] = last_a[3];
-                    float cosq3 = cosf(last_a[3] + dh[3][0]);
-                    float sinq3 = sinf(last_a[3] + dh[3][0]);
+                    float cosq3 = cosf(last_a[3] + dh[3].theta0);
+                    float sinq3 = sinf(last_a[3] + dh[3].theta0);
                     qw[0][2] = atan2f(cosq3 * r36[3] - sinq3 * r36[0], cosq3 * r36[0] + sinq3 * r36[3]);
                     qw[1][2] = last_a[5];
-                    float cosq5 = cosf(last_a[5] + dh[5][0]);
-                    float sinq5 = sinf(last_a[5] + dh[5][0]);
+                    float cosq5 = cosf(last_a[5] + dh[5].theta0);
+                    float sinq5 = sinf(last_a[5] + dh[5].theta0);
                     qw[1][0] = atan2f(cosq5 * r36[3] - sinq5 * r36[0], cosq5 * r36[0] + sinq5 * r36[3]);
                 } else {
                     qw[0][2] = last_a[5];
-                    float cosq5 = cosf(last_a[5] + dh[5][0]);
-                    float sinq5 = sinf(last_a[5] + dh[5][0]);
+                    float cosq5 = cosf(last_a[5] + dh[5].theta0);
+                    float sinq5 = sinf(last_a[5] + dh[5].theta0);
                     qw[0][0] = atan2f(cosq5 * r36[3] - sinq5 * r36[0], cosq5 * r36[0] + sinq5 * r36[3]);
                     qw[1][0] = last_a[3];
-                    float cosq3 = cosf(last_a[3] + dh[3][0]);
-                    float sinq3 = sinf(last_a[3] + dh[3][0]);
+                    float cosq3 = cosf(last_a[3] + dh[3].theta0);
+                    float sinq3 = sinf(last_a[3] + dh[3].theta0);
                     qw[1][2] = atan2f(cosq3 * r36[3] - sinq3 * r36[0], cosq3 * r36[0] + sinq3 * r36[3]);
                 }
                 out_solves->sol_flags[4 * ind_arm + 2 * ind_elbow + 0][2] = -1;
@@ -425,26 +483,13 @@ ik_status_t kinematics_inverse_all(const pose6d_t *target_pose,
                 int sol_idx = 4 * ind_arm + 2 * ind_elbow + ind_wrist;
                 float *a_out = out_solves->solutions[sol_idx].angles;
 
-                /* J1 */
-                float val = qs[ind_arm];
-                while (val > (float)M_PI) val -= (float)(2.0 * M_PI);
-                while (val < -(float)M_PI) val += (float)(2.0 * M_PI);
-                a_out[0] = RAD_TO_DEG(val);
-
-                /* J2, J3 */
+                /* J1 / J2,J3 / J4,J5,J6 —— 统一用 zenix_wrap_radian 归一化到 (-PI, PI] */
+                a_out[0] = RAD_TO_DEG(zenix_wrap_radian(qs[ind_arm]));
                 for (int i = 0; i < 2; i++) {
-                    val = qa[ind_elbow][i];
-                    while (val > (float)M_PI) val -= (float)(2.0 * M_PI);
-                    while (val < -(float)M_PI) val += (float)(2.0 * M_PI);
-                    a_out[1 + i] = RAD_TO_DEG(val);
+                    a_out[1 + i] = RAD_TO_DEG(zenix_wrap_radian(qa[ind_elbow][i]));
                 }
-
-                /* J4, J5, J6 */
                 for (int i = 0; i < 3; i++) {
-                    val = qw[ind_wrist][i];
-                    while (val > (float)M_PI) val -= (float)(2.0 * M_PI);
-                    while (val < -(float)M_PI) val += (float)(2.0 * M_PI);
-                    a_out[3 + i] = RAD_TO_DEG(val);
+                    a_out[3 + i] = RAD_TO_DEG(zenix_wrap_radian(qw[ind_wrist][i]));
                 }
 
                 out_solves->solutions[sol_idx].gripper = 0.0f;
@@ -473,7 +518,89 @@ ik_status_t kinematics_inverse_geometric(float x, float y, float z,
     return kinematics_inverse_6dof(&target_pose, cfg, out_js);
 }
 
-/* 6-DOF 最优逆运动学求解 */
+/* 在 8 组解析解中按策略选取最优可行解
+ * （6-DOF IK / 轨迹连续 IK 共用，新增选解策略只需加枚举与成本分支） */
+ik_status_t kinematics_select_solution(const ik_solutions_t *solves,
+                                       const ik_config_t *cfg,
+                                       solution_selector_t selector,
+                                       const joint_state_t *last_joints,
+                                       joint_state_t *out_js) {
+    if (!solves || !out_js) return IK_ERR_INVALID_PARAM;
+
+    ik_config_t c = cfg ? *cfg : kinematics_get_default_config();
+
+    /* 全部解均不可达（目标超出工作空间） */
+    bool all_invalid = true;
+    for (int i = 0; i < 8; i++) {
+        if (solves->sol_flags[i][1] != 0) {
+            all_invalid = false;
+            break;
+        }
+    }
+    if (all_invalid) return IK_ERR_OUT_OF_REACH;
+
+    int best_idx = -1;
+    float best_cost = 1e18f;
+
+    for (int i = 0; i < 8; i++) {
+        /* 过滤不可达解 */
+        if (solves->sol_flags[i][1] == 0) continue;
+
+        /* SOL_SELECT_MIN_SQUARED 遵循 cfg->arm_config 的分支限定；
+         * SOL_SELECT_CLOSEST_TO_LAST 以连续性优先，不做家族限定（与历史行为一致） */
+        if (selector == SOL_SELECT_MIN_SQUARED &&
+            c.arm_config >= 0 && (i / 4) != c.arm_config) {
+            continue;
+        }
+
+        /* 检查软限位 */
+        bool within_limits = true;
+        for (int j = 0; j < NUM_JOINTS; j++) {
+            if (!is_joint_within_limits(j, solves->solutions[i].angles[j])) {
+                within_limits = false;
+                break;
+            }
+        }
+        if (!within_limits) continue;
+
+        /* 成本函数：按策略计算 */
+        float cost = 0.0f;
+        if (selector == SOL_SELECT_CLOSEST_TO_LAST && last_joints) {
+            for (int j = 0; j < NUM_JOINTS; j++) {
+                float d = zenix_angle_diff_deg(last_joints->angles[j],
+                                               solves->solutions[i].angles[j]);
+                cost += d * d;
+            }
+        } else {
+            for (int j = 0; j < NUM_JOINTS; j++) {
+                float ang = solves->solutions[i].angles[j];
+                cost += ang * ang;
+            }
+        }
+
+        if (cost < best_cost) {
+            best_cost = cost;
+            best_idx = i;
+        }
+    }
+
+    if (best_idx < 0) {
+        /* 全部候选被软限位过滤：退回第一个肘部有效解并标记限位错误 */
+        for (int i = 0; i < 8; i++) {
+            if (solves->sol_flags[i][1] != 0) {
+                *out_js = solves->solutions[i];
+                return IK_ERR_JOINT_LIMIT;
+            }
+        }
+        return IK_ERR_OUT_OF_REACH;
+    }
+
+    *out_js = solves->solutions[best_idx];
+    return IK_SUCCESS;
+}
+
+/* 6-DOF 最优逆运动学求解
+ * 默认策略：各轴角度平方和最小，遵循 cfg->arm_config 分支限定 */
 ik_status_t kinematics_inverse_6dof(const pose6d_t *target_pose,
                                    const ik_config_t *cfg,
                                    joint_state_t *out_js) {
@@ -484,66 +611,5 @@ ik_status_t kinematics_inverse_6dof(const pose6d_t *target_pose,
     ik_status_t rc = kinematics_inverse_all(target_pose, NULL, &c, &solves);
     if (rc != IK_SUCCESS) return rc;
 
-    /* 检查是否全部无解（超出工作空间） */
-    bool all_invalid = true;
-    for (int i = 0; i < 8; i++) {
-        if (solves.sol_flags[i][1] != 0) {
-            all_invalid = false;
-            break;
-        }
-    }
-    if (all_invalid) return IK_ERR_OUT_OF_REACH;
-
-    /* 分支选择：
-     * 若指定 arm_config >= 0 且在 [0..7]，优先匹配对应索引
-     * 否则遍历 8 组解，选取在软限位内且总位移最优的解
-     */
-    int best_idx = -1;
-    float best_cost = 1e9f;
-
-    for (int i = 0; i < 8; i++) {
-        /* 过滤不可达解 */
-        if (solves.sol_flags[i][1] == 0) continue;
-
-        /* 若用户指定特定分支 */
-        if (c.arm_config >= 0 && (i / 4) != c.arm_config) {
-            continue;
-        }
-
-        /* 检查软限位 */
-        bool within_limits = true;
-        for (int j = 0; j < NUM_JOINTS; j++) {
-            if (!is_joint_within_limits(j, solves.solutions[i].angles[j])) {
-                within_limits = false;
-                break;
-            }
-        }
-        if (!within_limits) continue;
-
-        /* 计算加权距离成本 (优先更小的各轴转角) */
-        float cost = 0.0f;
-        for (int j = 0; j < NUM_JOINTS; j++) {
-            float ang = solves.solutions[i].angles[j];
-            cost += ang * ang;
-        }
-
-        if (cost < best_cost) {
-            best_cost = cost;
-            best_idx = i;
-        }
-    }
-
-    if (best_idx < 0) {
-        /* 如果因为限位找不到，但有解，再尝试找一个最接近限位的解 */
-        for (int i = 0; i < 8; i++) {
-            if (solves.sol_flags[i][1] != 0) {
-                *out_js = solves.solutions[i];
-                return IK_ERR_JOINT_LIMIT;
-            }
-        }
-        return IK_ERR_OUT_OF_REACH;
-    }
-
-    *out_js = solves.solutions[best_idx];
-    return IK_SUCCESS;
+    return kinematics_select_solution(&solves, &c, SOL_SELECT_MIN_SQUARED, NULL, out_js);
 }
