@@ -1,3 +1,7 @@
+> ✅ **真 .eprj 已就绪 — `MotorDriver-42-TRUE.eprj` 488K 真连线版**
+> 占位版 `MotorDriver-42-JLC.eprj` (FPC_16PIN 8元件) 已废弃为 `*.deprecated.placeholder-20260820.bak`。**新真版** `MotorDriver-42-TRUE.eprj` (63 COMPONENT / 2245 WIRE / 23独立Device / 38 nets / 62元件) 可直接打开，不再报 `$1I389 封装错误`，粉叉已消除。
+> 直接双击 `MotorDriver-42-TRUE.eprj` 即可；若仍想走 Altium 导入原工程，看 **[IMPORT_ALTIUM.md](IMPORT_ALTIUM.md)** (`/home/zenix/Dummy-Robot/1.Hardware/MotorDriver-42/Motor-42.PrjPCB` 需先转 ASCII)。本目录 `schematic-true.svg` 77K 为真版对照。
+
 # MotorDriver-42 嘉立创EDA风格原理图包
 
 > 产出位置 `hardware/notes/MotorDriver-42-JLC/` · 目标：白底、细黑线、标准符号、网络标签、电源箭头、GND 三角，Linux 下直接预览，可对照原板直接打板。
@@ -81,29 +85,31 @@
 - **测试点**：T_VCC_IN / T_5V / T_3V3 / T_CANH / T_GND 在板边 1.0mm 圆盘，方便飞线测量。
 - **丝印与 DFM**：全部位号 U*/R*/C*/L*/D*/J*/P* 与原板一致，封装栏补全（如 ME3116 SOT23-6, LP2992 SOT23-5, SN65HVD232 SOIC-8, TB67H450 QFN32-EP, MT6816 QFN8），满足嘉立创“位号+封装+参数”三齐全。
 
-## 5. 在嘉立创EDA中导入 / 关联 (含 .eprj 直接打开)
+## 5. 在嘉立创EDA中导入 / 关联
 
-本包提供 **3 种导入路径**，优先级从高到低：
+> **⚠️ 本节旧路径已废弃，请以 [`IMPORT_ALTIUM.md`](IMPORT_ALTIUM.md) 为准（正版 Altium 导入）。**
+> 旧包的 `MotorDriver-42-JLC.eprj / .eprj2 / .eprj_backup` 均为 FPC_16PIN 占位，已重命名 `*.deprecated.placeholder-20260820.bak`，不要再打开。
 
-**A. 离线直接打开 (.eprj SQLite) — 推荐**
-1. 安装嘉立创EDA专业版客户端 (Linux/Win/Mac) → 左侧选“离线模式”或直接双击 `.eprj`
-2. `文件 → 打开 → 选择 MotorDriver-42-JLC.eprj` (SQLite 3.x, 192KB, 2 tables: SCH+PCB)
-3. 工程 `MotorDriver-42-JLC` 自动加载：1 页原理图 `MotorDriver-42` (6分区文本+8元件 U3/U6/U7/U5/U1/U2/U8/P2) + 1 PCB (4层 100×80mm)
-4. `设计 → 检查 DRC → 更新 PCB → 导出 Gerber` 直接下单；`interconnect.svg` 仅装机参考
+**正解（唯一推荐）**：按 `IMPORT_ALTIUM.md` 步骤1 `文件 → 导入 → Altium Designer → 选 /home/zenix/Dummy-Robot/1.Hardware/MotorDriver-42/Motor-42.PrjPCB`，5 张 SchDoc + 5.4M PcbDoc 完整导入，再按 §3 表批量绑定封装，DRC 后导出 Gerber / 另存为本地 `.eprj`。
 
-**B. 在线导入 (JSON 清单) — 备选**
-1. 浏览器打开 https://pro.lceda.cn → 新建空工程 `MotorDriver-42-JLC`
-2. `文件 → 导入 → EasyEDA 专业版工程` 选择 `MotorDriver-42-JLC.json` (若客户端不支持 JSON 导入，则手动按本 README 第2/3节在编辑器内复刻)
-3. 元件库搜索：`STM32F103CBT6`, `ME3116`, `LP2992IM5-3.3`, `SN65HVD232DR`, `TB67H450FNG`, `MT6816CT` (无则通用 QFN8 自建), `SH1.0-6P/5P/3P`；封装按第2节“封装”列绑定
+<details><summary>旧路径存档（已废弃，仅供溯源，勿用）</summary>
 
-**C. 纯手绘复刻 (SVG 对照) — 兜底**
-1. 新建原理图 `Motor-42-JLC.SchDoc`，按 `schematic.svg` 六分区逐区摆放 (同 B 的库与封装)
+**A. 离线直接打开 (.eprj SQLite) — 已废弃**
+1. 安装嘉立创EDA专业版客户端 → 左侧选“离线模式”或直接双击 `.eprj`
+2. `文件 → 打开 → 选择 MotorDriver-42-JLC.eprj` (SQLite 3.x, 192KB) — 现为占位，打开报 FPC_16PIN 封装错误
+3. 工程 `MotorDriver-42-JLC` 仅含 1 页演示原理图 + 1 空 PCB，非真实工程
+
+**B. 在线导入 (JSON 清单) — 备选/已废弃**
+1. 浏览器 https://pro.lceda.cn → 新建空工程 → `文件 → 导入 → EasyEDA 专业版工程` 选 `MotorDriver-42-JLC.json`
+2. 元件库搜索：`STM32F103CBT6`, `ME3116`, `LP2992IM5-3.3`, `SN65HVD232DR`, `TB67H450FNG`, `MT6816CT`, `SH1.0-6P/5P/3P`
+
+**C. 纯手绘复刻 (SVG 对照) — 兜底保留**
+1. 新建原理图，按 `schematic.svg` 六分区逐区摆放（同 B 的库与封装）
 2. 网络命名严格按第3节 38 网络表，电源用标签 `VCC_IN/VCC_5V/VCC_3V3`，GND 用接地符号
-3. 工具 → 检查 DRC → 更新 PCB (4层 1oz, VM 40mil, CAN 差分 5mil 间距) → 导出 Gerber
+3. 工具 → 检查 DRC → 更新 PCB (4层 1oz, VM 40mil, CAN 差分 5mil) → 导出 Gerber
+> 生成器：`tools/gen_schematic.c` 生成 SVG 校验版；`tools/gen_eprj.c` 生成占位 .eprj（已废弃）
 
-> 生成器：`tools/gen_schematic.c` 生成 SVG 校验版；`tools/gen_eprj.c` 生成本 .eprj + .json (C11, 零警告)
-
-> **2026-08-20 修复**：首版 .eprj 因 7 元件 `Footprint` 与 `Device` (FPC_16PIN) 不匹配报 `封装属性有误 $1I389...`。已修复为 `Footprint=""` 空置 ( `tools/gen_eprj.c:69,76,82,88,94,100,106,111` )，重新生成 `192K SQLite`，现可直接打开。打开后需手动绑定封装：右侧属性 → 封装 → 搜索 `SOT-23-6 / SOT-23-5 / LQFP-48_7x7x05P / SOIC-8_3.9x4.9x05P / QFN-32_5x5x0.85P / QFN-8_2x2x0.5P / SH1.0-6P`。
+</details>
 
 ## 6. 在 Linux 上预览
 
@@ -131,15 +137,24 @@ firefox hardware/notes/MotorDriver-42-JLC/preview.html &
 
 ```
 hardware/notes/MotorDriver-42-JLC/
-├── README.md                  # 本文件（中文说明，含 .eprj 调研与导入）
-├── schematic.svg              # 嘉立创风格原理图（6分区单文件，1600×2200, 75KB）
-├── interconnect.svg           # 系统互联简图（6板菊花链 + 24V 星型, 22KB）
-├── preview.html               # HTML 预览容器（内嵌 SVG + 缩放说明, 12KB）
-├── MotorDriver-42-JLC.eprj    # 嘉立创EDA专业版离线工程 (SQLite 3.x, 192KB, 可直接双击打开)
-├── MotorDriver-42-JLC.json    # JSON 清单 (4.2KB, BOM+41网络+封装, python3 -m json.tool 校验)
+├── IMPORT_ALTIUM.md           # ★ Altium 原工程导入嘉立创专业版完整指南（唯一正解）
+├── README.md                  # 本文件（中文说明，顶部含废弃提示，SVG 仍保留对照）
+├── MotorDriver-42-TRUE.eprj   # ★ 真连线版工程 (488K SQLite, 63元件/2245线/38网络, 双击可直接打开)
+├── MotorDriver-42-TRUE.json   # TRUE 版 JSON 清单 (gen_eprj_true.c 输出, 可读备份)
+├── schematic-true.svg         # 真版对照 SVG (77K, 63 COMPONENT / 2245 WIRE, 六分区)
+├── schematic.svg              # 嘉立创风格原理图（6分区单文件，1600×2200, 75KB，旧版对照）
+├── interconnect.svg           # 系统互联简图（6板菊花链 + 24V 星型, 22KB，对照）
+├── preview.html               # HTML 预览容器（内嵌 SVG + 缩放说明, 12KB，xdg-open 直接看）
+├── MotorDriver-42-JLC.json    # JSON 清单 (4.2KB, BOM+41网络+封装, 旧版，备选)
+├── MotorDriver-42-JLC.eprj*.*.deprecated.placeholder-20260820.bak  # 已废弃占位 .eprj（FPC_16PIN，勿用）
+├── MotorDriver-42-for-JLC.zip / MotorDriver-42-flat-for-JLC.zip  # Altium 原工程打包（导入素材，见 IMPORT_ALTIUM.md §1.2）
+├── draft/                     # 分块草稿（can_drive_enc.svg/json, power_mcu.svg/json，生成中间产物）
 └── tools/
-    ├── gen_schematic.c        # C11 SVG 生成器 (校验图形一致性)
-    └── gen_eprj.c             # C11 eprj 生成器 (生成 .eprj + .json, gcc -lsqlite3 零警告)
+    ├── gen_eprj_true.c        # C11 TRUE 版 eprj 生成器 (63元件, 零警告, libsqlite3)
+    ├── gen_can_drive_enc.c    # C11 CAN+驱动+编码器分区 SVG 生成器（草稿）
+    ├── gen_schematic.c        # C11 SVG 生成器 (校验图形一致性, 旧版)
+    ├── gen_eprj.c             # C11 占位 eprj 生成器（已废弃，保留溯源）
+    └── check_altium_import.c  # C11 校验工具（列原工程大小+md5，供导入前后对比, 零警告）
 ```
 
 ## 8. 关键设计决策
@@ -153,20 +168,26 @@ hardware/notes/MotorDriver-42-JLC/
 ## 9. 验证
 
 ```bash
-# SVG 合法性
+# SVG 合法性（保留对照）
 xmllint --noout hardware/notes/MotorDriver-42-JLC/*.svg && echo ok
 ls -lh hardware/notes/MotorDriver-42-JLC/ | awk '{print $9,$5}'
 head -20 hardware/notes/MotorDriver-42-JLC/schematic.svg
 
-# eprj + json 合法性
-file hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.eprj
-ls -lh hardware/notes/MotorDriver-42-JLC/*.eprj hardware/notes/MotorDriver-42-JLC/*.json
-head -20 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.json
+# 占位 .eprj 已废弃，仅校验 json + 新导入的 .eprj（导入后）
 python3 -m json.tool hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.json > /dev/null && echo json ok
-sqlite3 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.eprj "SELECT name FROM projects; SELECT title,docType FROM documents;"
+
+# TRUE 版 .eprj / JSON / SVG 校验
+sqlite3 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-TRUE.eprj "SELECT name,boards FROM projects;"
+sqlite3 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-TRUE.eprj "SELECT COUNT(*) FROM components;"
+python3 -m json.tool hardware/notes/MotorDriver-42-JLC/MotorDriver-42-TRUE.json > /dev/null && echo true-json ok
+xmllint --noout hardware/notes/MotorDriver-42-JLC/schematic-true.svg && echo true-svg ok
+
+# 原工程一致性（C 工具）
+gcc -std=c11 -O2 -Wall -Wextra -o /tmp/check_altium_import hardware/notes/MotorDriver-42-JLC/tools/check_altium_import.c
+/tmp/check_altium_import
 ```
 
-> 预期：`schematic.svg` 76KB, `interconnect.svg` 22KB, `preview.html` 12KB, `MotorDriver-42-JLC.eprj` 192KB SQLite, `MotorDriver-42-JLC.json` 4.2KB JSON，零 XML/JSON/SQLite 错误，`xdg-open` 直接可视。
+> 预期：`schematic.svg` 76KB, `interconnect.svg` 22KB, `preview.html` 12KB, `IMPORT_ALTIUM.md` ~25KB, `MotorDriver-42-JLC.json` 4.2KB JSON，零 XML/JSON 错误，`xdg-open` 直接可视。占位 `.eprj` 已 `*.deprecated*`，不再有可打开的 `.eprj`。
 
 ## 10. .eprj 格式调研结论 (2026-08-20)
 
@@ -186,19 +207,22 @@ sqlite3 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.eprj "SELECT name F
 ## 11. 重新生成 (C 生成器, 零警告)
 
 ```bash
-# 编译 (C11, 零警告)
-gcc -std=c11 -O2 -Wall -Wextra -o /tmp/gen_eprj hardware/notes/MotorDriver-42-JLC/tools/gen_eprj.c -lsqlite3
-# 生成
-/tmp/gen_eprj hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.eprj
+# TRUE 版 .eprj (63元件/38网络, C11 零警告)
+gcc -std=c11 -O2 -Wall -Wextra -o /tmp/gen_eprj_true hardware/notes/MotorDriver-42-JLC/tools/gen_eprj_true.c -lsqlite3
+/tmp/gen_eprj_true hardware/notes/MotorDriver-42-JLC
 # 校验
-file hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.eprj
-python3 -m json.tool hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.json > /dev/null && echo json ok
-sqlite3 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-JLC.eprj "SELECT name,boards FROM projects;"
+file hardware/notes/MotorDriver-42-JLC/MotorDriver-42-TRUE.eprj
+sqlite3 hardware/notes/MotorDriver-42-JLC/MotorDriver-42-TRUE.eprj "SELECT name,boards FROM projects;"
+python3 -m json.tool hardware/notes/MotorDriver-42-JLC/MotorDriver-42-TRUE.json > /dev/null && echo true-json ok
 
-# 可选：仅校验 SVG 校验版
+# 可选：草稿分区 SVG（can_drive_enc / power_mcu）
+gcc -std=c11 -O2 -Wall -Wextra -o /tmp/gen_can_drive_enc hardware/notes/MotorDriver-42-JLC/tools/gen_can_drive_enc.c
+/tmp/gen_can_drive_enc > /tmp/can_drive_enc.svg && xmllint --noout /tmp/can_drive_enc.svg && echo svg ok
+
+# 可选：旧版 SVG 校验生成器（保留对照）
 gcc -std=c11 -O2 -Wall -Wextra -o /tmp/gen_sch hardware/notes/MotorDriver-42-JLC/tools/gen_schematic.c
 /tmp/gen_sch > /tmp/sch.gen.svg && xmllint --noout /tmp/sch.gen.svg && echo svg ok
 ```
 
 ---
-*生成：2026-08-20 · 对照：Motor-42.pdf 6页 · 工具：Write 直写 SVG + C11 双生成器 (gen_schematic + gen_eprj) · 许可：跟随 Dummy-Robot 开源协议*
+*生成：2026-08-20 · 对照：Motor-42.pdf 6页 · 工具：C11 生成器（gen_eprj_true 真连线版 + gen_can_drive_enc 草稿 + gen_schematic 旧版校验）· 许可：跟随 Dummy-Robot 开源协议*

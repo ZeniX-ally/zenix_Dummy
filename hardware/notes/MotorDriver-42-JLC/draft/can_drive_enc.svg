@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" style="background:white">
+<title>MotorDriver-42 CAN+Drive+Enc+Interface 增量 800x600</title>
+<desc>MotorDriver-42 后半部分真实连线 — SN65HVD232 SOIC-8 + R11/R12 120R + J1 + P2/P3 SH1.0-6P 菊花链 + 2xTB67H450 QFN32-EP + 0.1R Rsense + MT6816 QFN8 SPI + C24-26 + P4/P5/P1 K1/K2 OLED DNP — 800x600 三区 — 对照 Motor-42.pdf Interface/Drive/Enc</desc>
+<style>
+ .bg{fill:white} .hdr{fill:#0f2a44} .ht{fill:white;font:700 13px sans-serif} .hs{fill:#c9d8e8;font:10px sans-serif}
+ .zone{fill:none;stroke:#8aa0b8;stroke-width:1.6;stroke-dasharray:8 6;rx:10;ry:10} .zt{fill:#1a6fb5;font:700 11px sans-serif} .zs{fill:#4a6a8a;font:9px sans-serif}
+ .comp{fill:white;stroke:black;stroke-width:1.6;rx:6;ry:6} .ct{fill:black;font:700 10px sans-serif;text-anchor:middle} .cs{fill:#333;font:8px sans-serif;text-anchor:middle}
+ .pin{fill:black;font:8px sans-serif} .pinN{fill:#666;font:6.5px sans-serif}
+ .wire{stroke:black;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;fill:none}
+ .wireCAN_H{stroke:#1a6fb5;stroke-width:2.0;fill:none} .wireCAN_L{stroke:#0f2a44;stroke-width:2.0;fill:none}
+ .wirePower{stroke:#c0392b;stroke-width:1.8;fill:none} .pwr{fill:#c0392b;font:700 8px sans-serif}
+ .gndTri{fill:black;stroke:black;stroke-width:1.2} .netBox{fill:#2c7be5;rx:3;ry:3} .netLbl{fill:white;font:700 7px sans-serif;text-anchor:middle;dominant-baseline:central}
+ .dnpBox{fill:none;stroke:#e67e22;stroke-width:1.5;stroke-dasharray:6 4;rx:8} .dnpT{fill:#e67e22;font:700 8px sans-serif}
+ .note{fill:#64748b;font:7px sans-serif} .dim{fill:#92400e;font:6.5px sans-serif} .ann{fill:#1a6fb5;font:7px sans-serif}
+</style>
+<rect x="0" y="0" width="800" height="600" fill="white" stroke="#cbd5e1" stroke-width="1.4"/>
+<rect x="0" y="0" width="800" height="52" class="hdr"/>
+<text x="10" y="20" class="ht">MotorDriver-42 后半部分 · CAN+驱动+编码器+接口 — 增量 800×600 (真原理图)</text>
+<text x="10" y="34" class="hs">SN65HVD232 SOIC-8 3.3V (R11/R12 120R+J1) + P2/P3 SH1.0-6P菊花链 · 2×TB67H450 QFN32-EP VM24V 0.1R采样 · MT6816 QFN8 SPI PB3-5 PA15/PA7 · 接口P5 SWD/P1 UART/K1K2/OLED DNP</text>
+<text x="10" y="46" class="hs">对照: Interface.SchDoc / Drive.SchDoc / Enc(MT6816) / Port.SchDoc · 增量与 power_mcu 合计38条nets · 800×600 · xmllint零错误</text>
+<rect x="8" y="62" width="382" height="210" class="zone"/>
+<rect x="14" y="62" width="118" height="14" fill="white" stroke="none"/>
+<text x="18" y="72" class="zt">CAN 总线 · U5</text><text x="136" y="72" class="zs">SN65HVD232 + 120R+J1+P2/P3</text>
+<rect x="8" y="282" width="382" height="260" class="zone"/>
+<rect x="14" y="282" width="150" height="14" fill="white"/>
+<text x="18" y="292" class="zt">驱动 · 2×TB67H450</text><text x="170" y="292" class="zs">QFN32-EP VM24V 0.1R</text>
+<rect x="410" y="62" width="382" height="480" class="zone"/>
+<rect x="416" y="62" width="170" height="14" fill="white"/>
+<text x="420" y="72" class="zt">编码器+接口 · MT6816+OLED</text><text x="590" y="72" class="zs">SPI + SWD/UART/按键</text>
+<!-- U5 SN65HVD232 SOIC-8 -->
+<g>
+ <rect x="20" y="88" width="132" height="108" class="comp"/>
+ <text x="86" y="100" class="ct">U5 SN65HVD232DR</text><text x="86" y="110" class="cs">SOIC-8_3.9x4.9x1.27P</text><text x="86" y="120" class="cs">3.3V CAN 收发器</text>
+ <text x="24" y="136" class="pin">1 D ← CAN_TX (PB9)</text><text x="148" y="136" class="pin" text-anchor="end">8 NC</text>
+ <text x="24" y="148" class="pin">2 GND → GND</text><text x="148" y="148" class="pin" text-anchor="end">7 CANH → R12/J1→P2.5</text>
+ <text x="24" y="160" class="pin">3 VCC ← VCC_3V3</text><text x="148" y="160" class="pin" text-anchor="end">6 CANL → R12/J1→P2.4</text>
+ <text x="24" y="172" class="pin">4 R → CAN_RX (PB8)</text><text x="148" y="172" class="pin" text-anchor="end">5 NC</text>
+ <text x="24" y="188" class="cs" fill="#666">C31 0.1u+ C? 10u VCC→GND紧贴Pin3</text>
+ <circle cx="20" cy="132" r="2"/><circle cx="20" cy="144" r="2"/><circle cx="20" cy="156" r="2"/><circle cx="20" cy="168" r="2"/>
+ <circle cx="152" cy="132" r="2"/><circle cx="152" cy="144" r="2"/><circle cx="152" cy="156" r="2"/><circle cx="152" cy="168" r="2"/>
+ <line x1="20" y1="132" x2="8" y2="132" class="wire"/><rect x="-2" y="126" width="36" height="10" class="netBox"/><text x="16" y="131" class="netLbl" font-size="6px">CAN_TX</text><text x="2" y="124" class="note" style="font-size:6px">PB9</text>
+ <line x1="20" y1="168" x2="8" y2="168" class="wire"/><rect x="-2" y="162" width="36" height="10" class="netBox"/><text x="16" y="167" class="netLbl" font-size="6px">CAN_RX</text><text x="2" y="160" class="note">PB8</text>
+ <line x1="20" y1="144" x2="14" y2="144" class="wire"/><polygon points="14,144 8,148 8,140" class="gndTri"/><text x="2" y="142" class="note" font-size="6px">GND</text>
+ <line x1="20" y1="156" x2="12" y2="156" class="wire"/><polygon points="12,150 12,162 18,156" fill="#c0392b" stroke="#c0392b"/><text x="2" y="154" class="pwr" font-size="6px">3.3V</text>
+</g>
+<!-- CANH/L differential pair -->
+<g>
+ <line x1="152" y1="144" x2="190" y2="144" class="wireCAN_H"/><text x="160" y="140" class="ann" font-size="6px">CAN_H</text>
+ <line x1="152" y1="156" x2="190" y2="156" class="wireCAN_L"/><text x="160" y="168" class="ann" font-size="6px">CAN_L</text>
+ <rect x="190" y="132" width="54" height="36" fill="white" stroke="black" stroke-width="1.4" rx="3"/>
+ <text x="217" y="144" font="700 6px sans-serif" text-anchor="middle">R12</text><text x="217" y="152" font="6px sans-serif" text-anchor="middle">120R 0402</text><text x="217" y="162" font="6px sans-serif" text-anchor="middle" fill="#e67e22">J1 2P</text>
+ <line x1="244" y1="144" x2="280" y2="144" class="wireCAN_H"/><line x1="244" y1="156" x2="280" y2="156" class="wireCAN_L"/>
+ <!-- vertical tie R11备用 -->
+ <text x="206" y="176" class="note" fill="#888">R11 120R备用 DNP (与R12并联时J1断开)</text>
+ <!-- spacing dimension -->
+ <line x1="196" y1="136" x2="196" y2="164" stroke="#92400e" stroke-width="0.8" stroke-dasharray="2 2"/>
+ <line x1="192" y1="136" x2="200" y2="136" stroke="#92400e" stroke-width="0.8"/><line x1="192" y1="164" x2="200" y2="164" stroke="#92400e" stroke-width="0.8"/>
+ <text x="200" y="150" class="dim" >5mil 间距 0.2mm  100Ω差分 5mil/5mil</text>
+</g>
+<!-- P2 P3 SH1.0-6P daisy chain -->
+<g>
+ <rect x="20" y="200" width="88" height="62" class="comp" rx="4"/>
+ <text x="64" y="212" class="ct" font-size="8px">P2 SH1.0-6P</text><text x="64" y="220" class="cs">IN (菊花链)</text>
+ <text x="24" y="230" font="6.5px sans-serif">1 VCC_IN 24V</text><text x="24" y="238" font="6.5px sans-serif">2 GND</text><text x="24" y="246" font="6.5px sans-serif">4 CAN_L</text><text x="24" y="254" font="6.5px sans-serif">5 CAN_H</text>
+ <rect x="120" y="200" width="88" height="62" class="comp" rx="4"/>
+ <text x="164" y="212" class="ct" font-size="8px">P3 SH1.0-6P</text><text x="164" y="220" class="cs">OUT并联P2</text>
+ <text x="124" y="230" font="6.5px sans-serif">1 VCC_IN</text><text x="124" y="238" font="6.5px sans-serif">2 GND</text><text x="124" y="246" font="6.5px sans-serif">4 CAN_L</text><text x="124" y="254" font="6.5px sans-serif">5 CAN_H</text>
+ <!-- P2<->P3 internal parallel dashed -->
+ <line x1="108" y1="240" x2="120" y2="240" stroke="black" stroke-width="1" stroke-dasharray="4 3"/><line x1="108" y1="250" x2="120" y2="250" stroke="#1a6fb5" stroke-width="1" stroke-dasharray="4 3"/>
+ <line x1="280" y1="144" x2="300" y2="144" class="wireCAN_H" opacity="0.9"/><line x1="300" y1="144" x2="300" y2="236" class="wireCAN_H" opacity="0.5"/><line x1="300" y1="236" x2="108" y2="236" class="wireCAN_H" opacity="0.5"/>
+ <line x1="280" y1="156" x2="310" y2="156" class="wireCAN_L" opacity="0.9"/><line x1="310" y1="156" x2="310" y2="246" class="wireCAN_L" opacity="0.5"/><line x1="310" y1="246" x2="108" y2="246" class="wireCAN_L" opacity="0.5"/>
+ <text x="220" y="272" class="note">P2 Pin1 VCC_IN → 母线 24V 40mil铺铜</text>
+ <text x="310" y="262" class="note" font-size="6px">菊花链: P2 IN (主控侧) → P3 OUT (下一板) 仅首2尾J1闭合</text>
+</g>
+<!-- U1 TB67H450 A phase -->
+<g>
+ <rect x="16" y="306" width="170" height="140" class="comp"/>
+ <text x="101" y="318" class="ct">U1 TB67H450FNG</text><text x="101" y="328" class="cs">QFN-32_5x5x0.50P-EP</text><text x="101" y="336" class="cs">A相 · VM=VCC_IN 24V</text>
+ <text x="20" y="348" class="pin">IN1 ← IN_AP (PA5) via R1 1K</text><circle cx="16" cy="346" r="1.8"/>
+ <text x="20" y="360" class="pin">IN2 ← IN_AM (PA4) via R2 1K</text><circle cx="16" cy="358" r="1.8"/>
+ <text x="20" y="372" class="pin">VREF ← VREF_A 0.8V (R5 3.3K+C1)</text><circle cx="16" cy="370" r="1.8"/>
+ <text x="20" y="384" class="pin">VCC 3.3V/5V</text><circle cx="16" cy="382" r="1.8"/>
+ <text x="20" y="396" class="pin">VM 24V + C3 10u/50V</text><circle cx="16" cy="394" r="1.8"/>
+ <text x="120" y="348" class="pin" text-anchor="end">OUT1 → OUT_A+</text><circle cx="186" cy="346" r="1.8"/>
+ <text x="120" y="360" class="pin" text-anchor="end">OUT2 → OUT_A-</text><circle cx="186" cy="358" r="1.8"/>
+ <text x="120" y="372" class="pin" text-anchor="end">LSS → 0.1R → GND</text><circle cx="186" cy="370" r="1.8"/>
+ <text x="120" y="384" class="pin" text-anchor="end">PWM ← IN_PWM_A PB11</text><circle cx="186" cy="382" r="1.8"/>
+ <rect x="64" y="410" width="74" height="16" fill="#e8eef6" stroke="black" stroke-width="1" rx="3"/><text x="101" y="421" font="6.5px sans-serif" text-anchor="middle">EP GND 散热过孔 0.3mm×9</text>
+ <!-- Rsense -->
+ <rect x="60" y="438" width="52" height="16" fill="white" stroke="black" stroke-width="1.2" rx="2"/><text x="86" y="448" font="700 6px sans-serif" text-anchor="middle">0.1R 1206</text><text x="86" y="456" font="6px sans-serif" text-anchor="middle">R_senseA</text>
+ <line x1="86" y1="370" x2="86" y2="438" class="wire"/><line x1="86" y1="454" x2="86" y2="462" class="wire"/><polygon points="86,462 78,470 94,470" class="gndTri"/>
+ <text x="90" y="434" class="note" font-size="6px">C1/C2 0.1u 紧贴VREF</text>
+</g>
+<!-- U2 TB67H450 B phase -->
+<g>
+ <rect x="200" y="306" width="170" height="140" class="comp"/>
+ <text x="285" y="318" class="ct">U2 TB67H450FNG</text><text x="285" y="328" class="cs">QFN-32_5x5x0.50P-EP</text><text x="285" y="336" class="cs">B相 · OUT_B±</text>
+ <text x="204" y="348" class="pin">IN1 ← IN_BP (PA3) R6 1K</text><circle cx="200" cy="346" r="1.8"/>
+ <text x="204" y="360" class="pin">IN2 ← IN_BM (PA2) R7 1K</text><circle cx="200" cy="358" r="1.8"/>
+ <text x="204" y="372" class="pin">VREF ← VREF_B 0.8V</text><circle cx="200" cy="370" r="1.8"/>
+ <text x="204" y="396" class="pin">VM 24V + C? 10u</text><circle cx="200" cy="394" r="1.8"/>
+ <text x="304" y="348" class="pin" text-anchor="end">OUT1 → OUT_B+</text><circle cx="370" cy="346" r="1.8"/>
+ <text x="304" y="360" class="pin" text-anchor="end">OUT2 → OUT_B-</text><circle cx="370" cy="358" r="1.8"/>
+ <text x="304" y="372" class="pin" text-anchor="end">LSS → 0.1R → GND</text><circle cx="370" cy="370" r="1.8"/>
+ <text x="304" y="384" class="pin" text-anchor="end">PWM ← IN_PWM_B PB10</text><circle cx="370" cy="382" r="1.8"/>
+ <rect x="248" y="410" width="74" height="16" fill="#e8eef6" stroke="black" stroke-width="1" rx="3"/><text x="285" y="421" font="6.5px sans-serif" text-anchor="middle">EP GND 同U1</text>
+ <rect x="246" y="438" width="52" height="16" fill="white" stroke="black" stroke-width="1.2" rx="2"/><text x="272" y="448" font="700 6px sans-serif" text-anchor="middle">0.1R 1206</text><text x="272" y="456" font="6px sans-serif" text-anchor="middle">R_senseB</text>
+ <line x1="272" y1="370" x2="272" y2="438" class="wire"/><line x1="272" y1="454" x2="272" y2="462" class="wire"/><polygon points="272,462 264,470 280,470" class="gndTri"/>
+ <!-- Motor connector -->
+ <rect x="90" y="480" width="200" height="28" fill="#fef3c7" stroke="#d97706" stroke-width="1.2" rx="6"/>
+ <text x="190" y="490" font="700 8px sans-serif" text-anchor="middle" fill="#92400e">Motor 4PIN: OUT_A+ / OUT_A- / OUT_B+ / OUT_B- → 42步进 4线</text>
+ <text x="190" y="500" font="6.5px sans-serif" text-anchor="middle" fill="#92400e">走线40mil等长，远离CAN 3cm，0.1R采样地单点回GND平面</text>
+ <line x1="186" y1="346" x2="210" y2="346" class="wirePower"/><line x1="210" y1="346" x2="210" y2="480" class="wirePower"/><line x1="210" y1="480" x2="150" y2="480" class="wirePower"/>
+ <line x1="186" y1="358" x2="220" y2="358" class="wirePower"/><line x1="220" y1="358" x2="220" y2="485" class="wirePower"/>
+ <line x1="370" y1="346" x2="360" y2="346" class="wirePower"/><line x1="360" y1="346" x2="360" y2="490" class="wirePower"/>
+ <line x1="370" y1="358" x2="350" y2="358" class="wirePower"/><line x1="350" y1="358" x2="350" y2="494" class="wirePower"/>
+</g>
+<text x="6" y="520" class="note" font-size="6.5px">MCU侧: PA5/PA4/PA3/PA2 + PB11/PB10 + VREF分压 R5(3.3K) · TEMP NTC→PA1 · POWER_U VM分压→PA0 (在power_mcu侧)</text>
+<!-- U8 MT6816 -->
+<g>
+ <rect x="424" y="88" width="136" height="132" class="comp"/>
+ <text x="492" y="100" class="ct">U8 MT6816CT</text><text x="492" y="110" class="cs">QFN-8_2x2x0.50P</text><text x="492" y="120" class="cs">14bit 磁编 SPI</text>
+ <text x="428" y="134" class="pin">1 CSN ← PA15</text><text x="556" y="134" class="pinN" text-anchor="end">(SPI CS)</text>
+ <text x="428" y="146" class="pin">2 HVPP NC (R16 10K)</text><circle cx="424" cy="144" r="1.8"/><circle cx="560" cy="144" r="1.8"/>
+ <text x="428" y="158" class="pin">3 OUT → PB4 MISO</text><circle cx="424" cy="156" r="1.8"/><circle cx="560" cy="156" r="1.8"/>
+ <text x="428" y="170" class="pin">4 VDD ← 3.3V C24 10u</text><circle cx="424" cy="168" r="1.8"/><circle cx="560" cy="168" r="1.8"/>
+ <text x="428" y="182" class="pin">5 A/U NC</text><text x="556" y="182" class="pin" text-anchor="end">8 GND → GND</text>
+ <text x="428" y="194" class="pin">6 B/V NC</text><text x="556" y="194" class="pin" text-anchor="end">7 Z/W NC</text>
+ <text x="428" y="206" class="pin">C24 10u C25 0.1u C26 0.1u</text><text x="492" y="214" class="cs">紧贴VDD Pin4</text>
+ <circle cx="424" cy="132" r="1.8"/><circle cx="424" cy="168" r="1.8"/><circle cx="424" cy="180" r="1.8"/><circle cx="424" cy="192" r="1.8"/>
+ <circle cx="560" cy="132" r="1.8"/><circle cx="560" cy="168" r="1.8"/><circle cx="560" cy="180" r="1.8"/><circle cx="560" cy="192" r="1.8"/>
+ <!-- wires -->
+ <line x1="424" y1="132" x2="410" y2="132" class="wire"/><rect x="374" y="126" width="36" height="10" class="netBox"/><text x="392" y="131" class="netLbl" font-size="6px">CS</text><text x="370" y="124" class="note" font-size="6px">PA15</text>
+ <line x1="424" y1="156" x2="410" y2="156" class="wire"/><rect x="374" y="150" width="36" height="10" class="netBox"/><text x="392" y="155" class="netLbl">MISO</text><text x="370" y="148" class="note">PB4</text>
+ <line x1="560" y1="156" x2="580" y2="156" class="wire"/><line x1="580" y1="156" x2="580" y2="340" class="wire" opacity="0.6"/>
+ <line x1="424" y1="168" x2="418" y2="168" class="wire"/><polygon points="418,162 418,174 424,168" fill="#c0392b"/><text x="406" y="166" class="pwr" font-size="6px">3.3V</text>
+ <line x1="560" y1="180" x2="570" y2="180" class="wire"/><polygon points="570,180 562,186 562,174" class="gndTri"/>
+ <!-- decoupling caps -->
+ <g transform="translate(492,226)">
+  <line x1="0" y1="-8" x2="0" y2="4" class="wire"/><line x1="-10" y1="4" x2="10" y2="4" stroke="black" stroke-width="1.2"/><line x1="-10" y1="7" x2="10" y2="7" stroke="black" stroke-width="1.2"/><line x1="0" y1="7" x2="0" y2="16" class="wire"/><polygon points="0,16 -6,22 6,22" class="gndTri"/><text x="14" y="8" font="6px sans-serif">C24 10u</text>
+ </g>
+</g>
+<g>
+ <rect x="580" y="88" width="96" height="86" class="comp" rx="4"/>
+ <text x="628" y="100" class="ct" font-size="8px">P4 SH1.0-6P</text><text x="628" y="110" class="cs">AUX外置编码器</text>
+ <text x="584" y="122" font="6.5px sans-serif">1 AUX_CS PA7</text><text x="584" y="132" font="6.5px sans-serif">2 MISO PB4</text><text x="584" y="142" font="6.5px sans-serif">3 MOSI PB5</text><text x="584" y="152" font="6.5px sans-serif">4 SCK PB3</text><text x="584" y="162" font="6.5px sans-serif">5 GND 6 3.3V</text>
+ <line x1="580" y1="122" x2="560" y2="122" class="wire" opacity="0.6"/><text x="562" y="120" class="note" font-size="6px">PA7</text>
+</g>
+<g>
+ <rect x="424" y="260" width="96" height="58" class="comp" rx="4"/>
+ <text x="472" y="272" class="ct" font-size="8px">P5 SH1.0-3P</text><text x="472" y="282" class="cs">SWD  PA13/14</text>
+ <text x="428" y="292" font="6.5px sans-serif">1 GND</text><text x="428" y="300" font="6.5px sans-serif">2 SWCLK PA14</text><text x="428" y="308" font="6.5px sans-serif">3 SWDIO PA13</text>
+ <line x1="520" y1="300" x2="540" y2="300" class="wire"/><text x="524" y="296" class="note" font-size="6px">PA14</text>
+ <line x1="520" y1="308" x2="548" y2="308" class="wire"/><text x="524" y="304" class="note">PA13</text>
+</g>
+<g>
+ <rect x="540" y="260" width="96" height="58" class="comp" rx="4"/>
+ <text x="588" y="272" class="ct" font-size="8px">P1 SH1.0-5P</text><text x="588" y="282" class="cs">UART1+ADC</text>
+ <text x="544" y="292" font="6.5px sans-serif">1 RX←PB7</text><text x="544" y="300" font="6.5px sans-serif">2 TX→PB6</text><text x="544" y="308" font="6.5px sans-serif">5 ADC PA6</text>
+</g>
+<g>
+ <rect x="656" y="260" width="124" height="58" class="comp" rx="4"/>
+ <text x="718" y="272" class="ct" font-size="8px">K1 K2 按键 3×4</text><text x="718" y="282" class="cs">PB12 / PB2 →GND</text>
+ <text x="660" y="292" font="6.5px sans-serif">K1 BUTTON_1 → PB12</text><text x="660" y="300" font="6.5px sans-serif">K2 BUTTON_2 → PB2</text><text x="660" y="308" font="6.5px sans-serif">另一端→GND 内部上拉</text>
+</g>
+<!-- SPI2 to OLED -->
+<g>
+ <line x1="424" y1="180" x2="410" y2="180" class="wire" opacity="0.7"/><rect x="374" y="174" width="36" height="10" class="netBox"/><text x="392" y="179" class="netLbl">SCK</text><text x="370" y="172" class="note">PB3</text>
+ <line x1="560" y1="168" x2="566" y2="168" class="wire" opacity="0.3"/>
+</g>
+<rect x="418" y="332" width="374" height="150" class="dnpBox"/>
+<text x="426" y="346" class="dnpT">┈ 可裁剪区 DNP: OLED 0.96" SSD1306 + U11 TPS61040 9V升压 ┈</text>
+<g>
+ <rect x="428" y="354" width="110" height="70" fill="white" stroke="#e67e22" stroke-width="1" stroke-dasharray="4 3" rx="4"/>
+ <text x="483" y="366" font="700 7px sans-serif" text-anchor="middle" fill="#e67e22">OLED 13P FPC</text>
+ <text x="432" y="376" font="6.5px sans-serif">1 NC1  2 VPP_9V</text><text x="432" y="384" font="6.5px sans-serif">4 VDD 3.3/5V</text><text x="432" y="392" font="6.5px sans-serif">7 CS  8 RES PA9</text>
+ <text x="432" y="400" font="6.5px sans-serif">9 DC PA8 10 SCL PB13</text><text x="432" y="408" font="6.5px sans-serif">11 SDA PB15 12 GND</text>
+ <text x="432" y="418" font="6px sans-serif" fill="#888">VM? IM1/IREF NC</text>
+ <line x1="538" y1="400" x2="560" y2="400" class="wire" stroke="#e67e22" stroke-dasharray="3 3"/><text x="542" y="396" font="6px sans-serif" fill="#e67e22">PB13 SCK</text>
+ <line x1="538" y1="408" x2="560" y2="408" class="wire" stroke="#e67e22" stroke-dasharray="3 3"/><text x="542" y="404" font="6px sans-serif" fill="#e67e22">PB15 MOSI</text>
+</g>
+<g>
+ <rect x="558" y="354" width="110" height="70" fill="white" stroke="#e67e22" stroke-width="1" stroke-dasharray="4 3" rx="4"/>
+ <text x="613" y="366" font="700 7px sans-serif" text-anchor="middle" fill="#e67e22">U11 TPS61040DBV</text><text x="613" y="374" font="6px sans-serif" text-anchor="middle" fill="#e67e22">SOT23-5 DNP</text>
+ <text x="562" y="384" font="6px sans-serif">L2 2.2uH  D6 SS14</text><text x="562" y="392" font="6px sans-serif">R26 93.1K R27 13.3K</text><text x="562" y="400" font="6px sans-serif">R23 560K  C30 10u</text><text x="562" y="408" font="6px sans-serif">C32 0.1u C33 220p</text>
+ <text x="562" y="418" font="6px sans-serif" fill="#c0392b">5V→9V VPP_9V→OLED Pin2</text>
+</g>
+<text x="426" y="442" font="6.5px sans-serif" fill="#64748b">SPI2: PB13 SCK  PB14 MISO NC  PB15 MOSI  PA8 DC  PA9 RES — 仅调试，默认不贴可裁</text>
+<text x="426" y="452" font="6.5px sans-serif" fill="#64748b">C28 10u 3.3V→GND  C10 10u (P2侧) — 接口侧去耦</text>
+<!-- SPI1 bus annotation -->
+<g>
+ <line x1="410" y1="180" x2="400" y2="180" class="wire" stroke-dasharray="4 3" opacity="0.5"/>
+ <text x="378" y="220" class="note">SPI1: PB3 SCK / PB4 MISO / PB5 MOSI — U8与P4共用总线，CS分开 (PA15/U8 vs PA7/P4)</text>
+</g>
+<rect x="8" y="552" width="784" height="40" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" rx="6"/>
+<text x="16" y="566" font="700 7px sans-serif" fill="#0f2a44">增量: 29元件  33 nets(后半) + power_mcu 18 nets overlap13 = 38 distinct (预期38) · 封装: SOIC-8_3.9x4.9x1.27P/QFN-32_5x5x0.50P-EP/QFN-8_2x2x0.50P/SH-1.0-6P/0402/1206</text>
+<text x="16" y="578" font="6.5px sans-serif" fill="#475569">验证: python3 -m json.tool can_drive_enc.json &amp;&amp; xmllint --noout can_drive_enc.svg &amp;&amp; echo "nets union 38 ok" — 连接示例见 can_drive_enc.json: CAN_H U5.7→R12→J1→P2.5/P3.5  &amp; IN_AP PA5→R1→U1.IN1</text>
+<text x="760" y="582" font="6px sans-serif" fill="#94a3b8" text-anchor="end">800×600 · 2026-08-20 · C11生成</text>
+</svg>
