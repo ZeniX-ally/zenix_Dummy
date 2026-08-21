@@ -14,12 +14,25 @@
 | python3 | 3.12.3 | CLI-Tool |
 | python3-serial / usb / jinja2 / ipython | apt | CLI-Tool 依赖 |
 
+## 上游获取（首次）
+
+```bash
+# 默认路径 ~/Dummy-Robot（与 tools/*.sh 的 DUMMY_ROOT 默认一致）
+git clone https://github.com/peng-zhihui/Dummy-Robot.git ~/Dummy-Robot
+cd ~/Dummy-Robot && git checkout 84453f1
+# 如放其他路径，需导出环境变量：
+export DUMMY_ROOT=/path/to/Dummy-Robot
+# 或写入 ~/.bashrc / .env 持久化
+```
+
+> `make check` 会检测 `$DUMMY_ROOT` 是否存在，缺失时提示 `[MISS] 上游目录` 并可在任意路径用 `DUMMY_ROOT=/path/to/Dummy-Robot make build` 覆盖。
+
 ## 编译命令
 
 主控固件（STM32F405）：
 
 ```bash
-cd ~/Dummy-Robot/2.Firmware/Core-STM32F4-fw
+cd ${DUMMY_ROOT:-~/Dummy-Robot}/2.Firmware/Core-STM32F4-fw
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-include cstdio -include string -fpermissive"
 cmake --build build -j2
 ```
@@ -27,10 +40,12 @@ cmake --build build -j2
 电机驱动固件（STM32F103）：
 
 ```bash
-cd ~/Dummy-Robot/2.Firmware/Ctrl-Step-Driver-STM32F1-fw
+cd ${DUMMY_ROOT:-~/Dummy-Robot}/2.Firmware/Ctrl-Step-Driver-STM32F1-fw
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-include cstdio -include string -fpermissive"
 cmake --build build -j2
 ```
+
+或一键（推荐）：`make build` / `./tools/build.sh`（自动读取 `$DUMMY_ROOT`）。
 
 输出文件在 `build/` 下的 `.elf / .hex / .bin`。
 
@@ -52,7 +67,7 @@ GCC 13 比原仓库时代更严格，修改已归档入 `firmware/patches/patch-
 ## CLI-Tool
 
 ```bash
-cd ~/Dummy-Robot/3.Software/CLI-Tool
+cd ${DUMMY_ROOT:-~/Dummy-Robot}/3.Software/CLI-Tool
 python3 run_shell.py --help
 ```
 

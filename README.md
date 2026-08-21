@@ -18,8 +18,12 @@
 ## 参考
 
 - 官方仓库：https://github.com/peng-zhihui/Dummy-Robot
-- 本地源码：/home/zenix/Dummy-Robot
+- 本地源码：`$DUMMY_ROOT`（默认 `~/Dummy-Robot`，可用 `export DUMMY_ROOT=/path/to/Dummy-Robot` 覆盖，见 `ENV.md`）
+- 上游基线：`84453f1`（见 `docs/roadmap.md`）
 - 任务：T014656
+
+> 首次使用：`git clone https://github.com/peng-zhihui/Dummy-Robot.git ~/Dummy-Robot && cd ~/Dummy-Robot && git checkout 84453f1`
+> 或自定义路径：`git clone https://github.com/peng-zhihui/Dummy-Robot.git /path/to/Dummy-Robot && export DUMMY_ROOT=/path/to/Dummy-Robot`
 
 ## 文档与架构
 

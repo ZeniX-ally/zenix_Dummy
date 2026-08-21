@@ -1,0 +1,47 @@
+name: CI
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make libxml2-utils python3
+
+      - name: Check src build (kinematics/protocol/trajectory 11 tests)
+        run: |
+          make -C src clean
+          make -C src run
+
+      - name: Validate opencode.json
+        run: python3 -m json.tool opencode.json > /dev/null && echo "opencode.json OK"
+
+      - name: Validate SVG (if xmllint available)
+        run: |
+          if ls hardware/notes/MotorDriver-42-JLC/*.svg 1>/dev/null 2>&1; then
+            xmllint --noout hardware/notes/MotorDriver-42-JLC/*.svg && echo "SVG OK"
+          else
+            echo "no SVG to check"
+          fi
+
+      - name: Check .gitattributes eol
+        run: |
+          git ls-files --eol | grep -E "tools/.*\.sh" | grep -v "lf" && echo "EOL check failed" && exit 1 || echo "EOL LF OK"
+
+      - name: Check no secret in repo
+        run: |
+          # 避免在 CI 文件中明文存放真实 Key，仅用前缀片段做启发式检查；真实 Key 已移至 .env (gitignored)
+          if grep -R "QDRANT_API_KEY" --exclude-dir=.git --include="*.json" --include="*.py" --include="*.md" . | grep -v "changeme" | grep -E -q "[a-f0-9]{32,}"; then
+            echo "possible secret leaked (QDRANT_API_KEY contains hex-like value not changeme)!" && exit 1
+          else
+            echo "no secret leaked"
+          fi

@@ -1,0 +1,35 @@
+# 统一换行符与二进制声明，修 P0-5 CRLF 污染
+* text=auto eol=lf
+
+# 脚本与源码强制 LF
+*.sh text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.py text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+
+# SVG 视为文本（便于 diff），但强制 LF
+*.svg text eol=lf
+
+# 二进制不做转换
+*.eprj binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.o binary
+*.elf binary
+*.hex binary
+*.bin binary
+*.map binary
+*.a binary
+*.bak binary

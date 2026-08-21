@@ -7,8 +7,10 @@ build/
 *.o
 *.out
 *.a
+*.exe
 # src/ 编译产物
 /src/zenix_dummy_demo
+/src/zenix_dummy_demo.exe
 
 # 上游源码克隆（本仓库不纳入）
 /home/zenix/Dummy-Robot/
@@ -22,6 +24,10 @@ __pycache__/
 *.swp
 .idea/
 .vscode/
+
+# 环境变量（秘钥）
+.env
+mcp-qdrant/.env
 
 # 工具脚本备份
 *.bak

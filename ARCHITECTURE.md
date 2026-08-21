@@ -44,7 +44,7 @@
 
 ## 2. 仓库目录架构
 
-本仓库**不复制上游源码**（上游在 `~/Dummy-Robot`），只存放：
+本仓库**不复制上游源码**（上游在 `$DUMMY_ROOT`，默认 `~/Dummy-Robot`，可用 `export DUMMY_ROOT=/path/to/Dummy-Robot` 覆盖，见 `ENV.md`），只存放：
 项目级文档、对上游的补丁、工具脚本、以及本项目独有产物。
 
 ```
@@ -84,7 +84,7 @@ zenix_Dummy/
 
 ## 3. 核心原则
 
-1. **源码不重复**：上游固件/上位机源码一律放在 `~/Dummy-Robot`，本仓库用 `patches/` 记录对它的改动。
+1. **源码不重复**：上游固件/上位机源码一律放在 `$DUMMY_ROOT`（默认 `~/Dummy-Robot`），本仓库用 `patches/` 记录对它的改动。
 2. **差异可追溯**：对上游的任何修改都导出为 `.patch` 放入 `firmware/patches/`，并在文档中注明原因（如 GCC 13 兼容）。
 3. **按层解耦**：机械 / 驱动 / 主控 / 应用 各层独立演进，跨层只走定义好的协议。
 4. **文档即事实**：需求、BOM、路线图、接线方案都在 `docs/` 下维护，作为开发与采购依据。
@@ -109,10 +109,18 @@ tools/serial_test.sh / CLI-Tool 联调验证
 更新 docs/（roadmap 勾选里程碑、记录踩坑）
 ```
 
-**补丁导出命令**（在 `~/Dummy-Robot` 中）：
+**上游获取**（首次）：
 
 ```bash
-git diff > zenix_Dummy/firmware/patches/xxx-<描述>.patch
+git clone https://github.com/peng-zhihui/Dummy-Robot.git ~/Dummy-Robot && cd ~/Dummy-Robot && git checkout 84453f1
+# 自定义路径：export DUMMY_ROOT=/path/to/Dummy-Robot
+```
+
+**补丁导出命令**（在 `$DUMMY_ROOT` 中）：
+
+```bash
+git diff > $DUMMY_ROOT/../zenix_Dummy/firmware/patches/xxx-<描述>.patch
+# 或在 zenix_Dummy 中：make patches-export
 ```
 
 ---

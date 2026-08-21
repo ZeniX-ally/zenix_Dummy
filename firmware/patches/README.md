@@ -1,6 +1,6 @@
 # patches/ — 上游兼容修改补丁
 
-本目录存放对上游 `~/Dummy-Robot` 源码的所有修改补丁，是"差异唯一事实来源"。
+本目录存放对上游 `$DUMMY_ROOT`（默认 `~/Dummy-Robot`，见 `ENV.md`）源码的所有修改补丁，是"差异唯一事实来源"。
 
 ## 已有补丁
 
@@ -10,11 +10,11 @@
 
 ## 流程
 
-在 `~/zenix_Dummy` 中一键导出：
+在 `zenix_Dummy` 中一键导出（自动读取 `$DUMMY_ROOT`）：
 
 ```bash
 make patches-export
-# 或 ./tools/export_patches.sh
+# 或 DUMMY_ROOT=/path/to/Dummy-Robot ./tools/export_patches.sh
 ```
 
 一键测试/应用：

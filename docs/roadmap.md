@@ -4,8 +4,10 @@
 
 ## 上游基线
 
-- 上游仓库：`~/Dummy-Robot`
+- 上游仓库：`$DUMMY_ROOT`（默认 `~/Dummy-Robot`，可用 `export DUMMY_ROOT=/path/to/Dummy-Robot` 覆盖，见 `ENV.md`）
+- 上游远程：`https://github.com/peng-zhihui/Dummy-Robot`
 - 上游 base commit：`84453f1` (Merge pull request #144 from TitanRGB-Contribute/main)
+- 获取：`git clone https://github.com/peng-zhihui/Dummy-Robot.git ~/Dummy-Robot && cd ~/Dummy-Robot && git checkout 84453f1`
 
 ## 补丁列表 (firmware/patches/)
 
